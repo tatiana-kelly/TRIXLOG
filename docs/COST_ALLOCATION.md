@@ -312,12 +312,26 @@ Todos abaixo usam exclusivamente colunas já confirmadas nas 3 planilhas:
 5. **Duas séries numéricas desconexas (CT-e vs. Contrato de Transporte).** Confirmado nos dados de exemplo (contratos 68/69 vs. CT-e's 24/382/384/385/386) — não há relação aritmética ou de intervalo aparente entre as séries, então nenhuma heurística baseada em proximidade numérica é viável; só nome/data/valor.
 6. **Ausência de campo de data em `Contas Pagar.xlsx`** (não foi citada nenhuma coluna de data nessa planilha, diferente de CT-e e Contas Receber). Isso enfraquece a Camada 2 (heurística por janela de data), pois não há certeza de que exista uma data de pagamento/lançamento utilizável — **PREMISSA A VALIDAR**: confirmar com a planilha real se existe coluna de data em Contas Pagar não mencionada no escopo desta tarefa.
 7. **Fatura sem número de identificação explícito.** As colunas listadas para Contas Receber não incluem um "Número da Fatura" — apenas Cliente + Observação + valores. Se não existir, cada fatura precisa de uma chave substituta (surrogate), o que é aceitável, mas dificulta rastreabilidade externa (ex. conferência com o cliente).
-8b. **Nome de cliente inconsistente entre lançamentos** — confirmado no lote de 18 relatórios
-reais (maio/junho/julho): "MINERVA S.A." e "MINERVA S A" aparecem como duas linhas separadas no
-ranking de rentabilidade por cliente, sendo claramente a mesma empresa (pontuação/espaçamento
-diferente). Isso distorce Pareto e concentração de receita se não for tratado. **Decisão
-deliberada de não normalizar automaticamente** (nunca inventar/inferir identidade sem uma regra
-seguramente validada) — fica registrado como gap a resolver com um cadastro de clientes
-canônico (de-para) quando houver tempo, não com fuzzy-match automático.
+8b. **Nome de cliente inconsistente entre lançamentos — RESOLVIDO.** Confirmado no lote de 18
+relatórios reais (maio/junho/julho): "MINERVA S.A." e "MINERVA S A" apareciam como duas linhas
+separadas no ranking de rentabilidade por cliente, distorcendo Pareto e concentração de receita.
+Implementado em `app/services/client_identity.py`: normalização **determinística** (maiúsculas,
+sem acento/pontuação, colapso de espaço, equivalência só de sufixo societário padrão — S/A,
+S.A., S A → SA; LTDA./LTDA → LTDA) — deliberadamente **sem fuzzy-match por distância de string**,
+porque isso mesclaria erroneamente empresas diferentes com nome parecido. Caso real nos mesmos
+dados que prova o risco: "CHINT ELETRIC CO. LTD" (matriz na China) e "CHINT ELETRICOS AMERICA DO
+SUL LTDA" (subsidiária brasileira) são pagadores de frete distintos e continuam separados após a
+normalização. Validado contra os 30 nomes distintos reais do trimestre: só o par MINERVA
+mesclou; nenhum outro par foi indevidamente unificado. O nome de exibição escolhido por grupo é
+o mais frequente nos lançamentos (empate: mais longo; novo empate: ordem alfabética — regra
+determinística, testada em `tests/unit/test_client_identity.py`).
+
+8c. **"JC COIMBRA II DISTRIBUI��O SA" — nome de cliente com caractere corrompido na origem.**
+Confirmado lendo o `.xlsx` real (`Ct-e filial maio.xlsx`) diretamente com pandas: a corrupção já
+está no arquivo de origem, não é um bug de import/encoding deste projeto. Provável perda de
+"ÇÃ" em "DISTRIBUIÇÃO" na exportação do sistema de origem da TRIXLOG. Não corrigido
+automaticamente (violaria a regra de nunca inventar dado — mesmo um "conserto" de acentuação
+óbvio é uma inferência, não um fato lido). Fica registrado para correção manual num cadastro de
+clientes canônico futuro, ou reporte à TRIXLOG do problema na exportação de origem.
 
 9. **`Pedágio` pode ou não estar incluso em `Total`/`Subtotal`** — a relação aritmética entre `Valor do Frete + Valor do Frete Peso + Pedágio = Subtotal = Total` não foi confirmada nos dados citados. Antes de montar a DRE por viagem (seção 3.1), validar essa fórmula com uma amostra de linhas reais para não contar Pedágio em duplicidade ou subtraí-lo quando já é repasse líquido.

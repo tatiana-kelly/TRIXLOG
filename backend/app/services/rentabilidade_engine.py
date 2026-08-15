@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.models.contrato_transporte import ContratoTransporte
 from app.models.cte import CTe
 from app.models.viagem_link import ViagemLink
+from app.services.client_identity import build_canonical_names
 
 
 @dataclass
@@ -50,6 +51,14 @@ def calcular_rentabilidade_por_cliente(
     contratos_by_key = {(c.contrato_numero, c.unidade): c for c in db.query(ContratoTransporte).all()}
     links_by_cte_id = {link.cte_id: link for link in db.query(ViagemLink).all()}
 
+    # Nome canônico calculado sobre TODOS os CT-e's do banco (não só os filtrados por mês/unidade)
+    # para o mesmo cliente sempre resolver para o mesmo nome de exibição, independente do filtro
+    # aplicado na tela. Ver docs/COST_ALLOCATION.md#8b — mescla só grafia (MINERVA S A / S.A.),
+    # nunca empresas distintas com nome parecido (CHINT matriz China x CHINT Brasil continuam
+    # separadas).
+    todos_nomes = [nome for (nome,) in db.query(CTe.pagador_frete_nome).all()]
+    nome_canonico = build_canonical_names(todos_nomes)
+
     por_cliente: dict[str, RentabilidadeCliente] = {}
 
     query = db.query(CTe)
@@ -61,7 +70,7 @@ def calcular_rentabilidade_por_cliente(
         if mes_referencia and cte_mes != mes_referencia:
             continue
 
-        cliente = cte.pagador_frete_nome
+        cliente = nome_canonico[cte.pagador_frete_nome]
         bucket = por_cliente.setdefault(cliente, RentabilidadeCliente(cliente=cliente))
 
         link = links_by_cte_id.get(cte.id)
