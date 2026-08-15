@@ -1,0 +1,12 @@
+# Python (quando o backend for criado)
+__pycache__/
+*.pyc
+.venv/
+
+# Segredos — nunca commitar
+.env
+*.env.local
+
+# Editores/SO
+.DS_Store
+Thumbs.db

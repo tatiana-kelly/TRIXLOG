@@ -1,0 +1,127 @@
+# domain-routing.yaml — TRIXLOG Transportes
+# Roteamento por tipo de caso: o coordenador-central usa esta tabela para decidir
+# quais agentes acionar. "sempre" = acionado por padrão nesse tipo de caso.
+# "condicional" = acionado apenas se o caso concreto justificar (ex.: envolve cliente
+# grande específico, ou toca sinal de comex).
+
+version: 1
+
+casos:
+
+  queda_rentabilidade_cliente_viagem:
+    descricao: >
+      Margem por cliente, rota ou viagem caiu abaixo do esperado, ou está
+      inconsistente entre viagens/clientes comparáveis.
+    agentes_sempre:
+      - investigador
+      - rentabilidade-cliente-viagem
+      - provocador
+      - solucoes-acoes-praticas
+      - conselheiro-executivo
+    agentes_condicionais:
+      - custos-frete-terceiro   # quando a viagem foi coberta por terceiro/agregado
+      - combustivel-pedagio     # quando pedágio é componente relevante do desvio
+      - contas-a-receber-pagar  # quando o desvio de margem se mistura com atraso de recebimento
+
+  aumento_custo_frete_terceiro:
+    descricao: >
+      Custo pago a transportadores terceiros/agregados (centro de custo FRETES
+      TERCEIROS) subiu acima do esperado, ou há inconsistência em adiantamento/saldo.
+    agentes_sempre:
+      - investigador
+      - custos-frete-terceiro
+      - provocador
+      - solucoes-acoes-praticas
+      - conselheiro-executivo
+    agentes_condicionais:
+      - frota-motoristas        # quando o desvio se concentra num transportador/agregado específico
+      - combustivel-pedagio     # quando a hipótese envolve variação de rota/pedágio
+      - rentabilidade-cliente-viagem  # quando é preciso saber o impacto na margem final
+
+  atraso_ocorrencia_recorrente:
+    descricao: >
+      Atraso de entrega, avaria, extravio ou outra ocorrência operacional
+      recorrente numa rota, cliente ou transportador.
+    agentes_sempre:
+      - investigador
+      - operacoes-cte-ocorrencias
+      - provocador
+      - solucoes-acoes-praticas
+      - conselheiro-executivo
+    agentes_condicionais:
+      - frota-motoristas         # quando a concentração aponta para veículo/motorista
+      - custos-frete-terceiro    # quando o transportador envolvido também é foco de custo
+
+  inadimplencia_atraso_recebimento:
+    descricao: >
+      Cliente pagador de frete com atraso de recebimento, DSO alto, ou
+      inadimplência declarada.
+    agentes_sempre:
+      - investigador
+      - contas-a-receber-pagar
+      - provocador
+      - solucoes-acoes-praticas
+      - conselheiro-executivo
+    agentes_condicionais:
+      - rentabilidade-cliente-viagem  # para medir se o cliente inadimplente também tem margem ruim
+
+  pedido_cotacao_novo:
+    descricao: >
+      Fluxo comercial recorrente (não é um desvio a diagnosticar): cliente pede
+      cotação de frete, ou a TRIXLOG precisa cotar com terceiro/agregado para
+      cobrir uma carga. Rota própria, mais leve que o fluxo de desvio.
+    agentes_sempre:
+      - cotacao-orcamento-frete
+    agentes_condicionais:
+      - custos-frete-terceiro     # quando é preciso cotar cobertura via terceiro
+      - conselheiro-executivo     # apenas se o padrão de cotações perdidas virar item de decisão
+    observacao: >
+      Não aciona investigador nem provocador por padrão — não é um desvio,
+      é processo comercial normal. Só escala para investigador se
+      cotacao-orcamento-frete identificar um padrão sistêmico anômalo
+      (ex.: taxa de conversão caindo consistentemente numa rota/cliente).
+
+  oscilacao_custo_combustivel_pedagio:
+    descricao: >
+      Variação relevante no valor de pedágio por rota, ou (quando houver frota
+      própria) no custo de combustível.
+    agentes_sempre:
+      - investigador
+      - combustivel-pedagio
+      - provocador
+      - solucoes-acoes-praticas
+    agentes_condicionais:
+      - custos-frete-terceiro    # quando a oscilação pode estar embutida no pagamento a terceiro
+      - conselheiro-executivo    # quando o impacto financeiro justifica priorização formal
+
+  inconsistencia_fiscal_cte:
+    descricao: >
+      CFOP inconsistente, indício de tributação incorreta, ou CT-e com destino
+      exterior/sinal de comex.
+    agentes_sempre:
+      - investigador
+      - fiscal-cte
+      - provocador
+    agentes_condicionais:
+      - comex-dta-di              # sempre que houver sinal de destino exterior/DTA/DI/contêiner
+      - conselheiro-executivo     # quando o achado precisa de decisão humana priorizada
+    observacao: >
+      comex-dta-di, quando acionado aqui, deve declarar explicitamente que está
+      em fase 2 (dado insuficiente) a menos que dado estruturado novo tenha aparecido.
+
+  produtividade_frota_motorista:
+    descricao: >
+      Investigação de produtividade comparada entre frota própria e agregada,
+      ou risco de padrão trabalhista num relacionamento com agregado.
+    agentes_sempre:
+      - investigador
+      - frota-motoristas
+      - provocador
+    agentes_condicionais:
+      - custos-frete-terceiro
+      - operacoes-cte-ocorrencias
+      - conselheiro-executivo
+    observacao: >
+      Qualquer achado que sugira risco de vínculo empregatício deve ser
+      escalado para aprovação humana explícita antes de virar recomendação
+      de ação — nunca vira decisão automática.

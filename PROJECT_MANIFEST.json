@@ -1,0 +1,41 @@
+{
+  "project": "TRIXLOG Torre de Controle",
+  "client": "TRIXLOG Transportes",
+  "version": "0.1.0",
+  "agents_count": 14,
+  "agents": [
+    "coordenador-central",
+    "investigador",
+    "provocador",
+    "conselheiro-executivo",
+    "solucoes-acoes-praticas",
+    "rentabilidade-cliente-viagem",
+    "custos-frete-terceiro",
+    "contas-a-receber-pagar",
+    "cotacao-orcamento-frete",
+    "operacoes-cte-ocorrencias",
+    "frota-motoristas",
+    "fiscal-cte",
+    "combustivel-pedagio",
+    "comex-dta-di"
+  ],
+  "core_rule": "maior resultado com menor esforço",
+  "core_problem": "rentabilidade por cliente bloqueada pela falta de chave de alocação de custo por viagem — não falta de lançamento",
+  "generated_for": "Claude Code",
+  "grounded_in_real_data": [
+    "examples/contas_receber_real.xlsx",
+    "examples/contas_pagar_real.xlsx",
+    "examples/cte_real.xlsx"
+  ],
+  "related_project_same_client": {
+    "path": "C:\\Freight Intelligence OS",
+    "status": "mantido separado por decisão da Tatiana em 2026-08-15",
+    "note": "PRP anterior, feito sem dado real, foco comex/DTA/DI mais elaborado — referência futura, não mesclar sem instrução explícita"
+  },
+  "changes": [
+    "Projeto criado a partir de 3 relatórios reais (CT-e, Contas a Receber, Contas a Pagar)",
+    "Cost Allocation Engine desenhado em 3 camadas (docs/COST_ALLOCATION.md)",
+    "Módulo de cotação/orçamento de frete desenhado (docs/QUOTING_MODULE.md)",
+    "14 agentes especializados adaptados/criados para o negócio real da TRIXLOG"
+  ]
+}
