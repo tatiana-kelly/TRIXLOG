@@ -100,7 +100,7 @@ async function renderRentabilidade() {
   const unidade = document.getElementById("rent-unidade").value;
   if (!mes) { el.innerHTML = emptyState("Sem meses disponíveis.", "Importe relatórios primeiro."); return; }
 
-  el.innerHTML = "Carregando…";
+  el.innerHTML = scanning("Sincronizando dado");
   try {
     const dados = await api(`/analytics/rentabilidade-mensal?mes=${mes}${unidade ? "&unidade=" + unidade : ""}`);
     if (!dados.length) { el.innerHTML = emptyState("Nenhum CT-e neste mês/unidade."); return; }
@@ -117,8 +117,8 @@ async function renderRentabilidade() {
         <td>${esc(d.cliente)}</td>
         <td class="num">${brl(d.receita_total)}</td>
         <td class="num">${d.viagens_com_custo_alocado ? brl(d.custo_alocado_total) : "—"}</td>
-        <td class="num">${d.viagens_com_custo_alocado ? brl(d.margem_total) : "não determinável"}</td>
-        <td class="num">${d.pct_custo_nao_alocado > 50 ? `<span class="pill pill--warn">${pct(d.pct_custo_nao_alocado)} pendente</span>` : pct(d.pct_custo_nao_alocado)}</td>
+        <td class="num">${margemCell(d)}</td>
+        <td class="num">${d.pct_custo_nao_alocado > 50 ? `<span class="pill pill--warn"><span class="radar-light radar-light--pending"></span>${pct(d.pct_custo_nao_alocado)} pendente</span>` : pct(d.pct_custo_nao_alocado)}</td>
       </tr>`
       )
       .join("");
@@ -156,7 +156,7 @@ async function loadComparativo() {
 async function renderComparativo() {
   const el = document.getElementById("comparativo-content");
   const unidade = document.getElementById("comp-unidade").value;
-  el.innerHTML = "Carregando…";
+  el.innerHTML = scanning("Sincronizando dado");
   try {
     const meses = await api("/analytics/meses");
     if (!meses.length) { el.innerHTML = emptyState("Sem meses disponíveis."); return; }
@@ -210,7 +210,7 @@ async function renderDesvios() {
   const mesAnterior = document.getElementById("desvio-mes-anterior").value;
   const mesAtual = document.getElementById("desvio-mes-atual").value;
   const unidade = document.getElementById("desvio-unidade").value;
-  el.innerHTML = "Carregando…";
+  el.innerHTML = scanning("Sincronizando dado");
   try {
     const dados = await api(
       `/analytics/desvios?mes_atual=${mesAtual}&mes_anterior=${mesAnterior}${unidade ? "&unidade=" + unidade : ""}`
@@ -228,7 +228,7 @@ async function renderDesvios() {
         <td class="num">${brl(d.receita_atual)}</td>
         <td class="num">${d.variacao_absoluta >= 0 ? "+" : ""}${brl(d.variacao_absoluta)}</td>
         <td class="num">${d.variacao_percentual >= 0 ? "+" : ""}${pct(d.variacao_percentual)}</td>
-        <td><span class="pill ${d.tipo === "queda_receita" ? "pill--danger" : "pill--ok"}">${d.tipo === "queda_receita" ? "queda" : "aumento"}</span></td>
+        <td><span class="pill ${d.tipo === "queda_receita" ? "pill--danger" : "pill--ok"}"><span class="radar-light ${d.tipo === "queda_receita" ? "radar-light--alert" : "radar-light--ok"}"></span>${d.tipo === "queda_receita" ? "queda" : "aumento"}</span></td>
       </tr>`
       )
       .join("");
@@ -249,7 +249,7 @@ async function renderDesvios() {
 // ---------------- conciliação ----------------
 async function loadConciliacao() {
   const el = document.getElementById("conciliacao-content");
-  el.innerHTML = "Carregando…";
+  el.innerHTML = scanning("Sincronizando dado");
   try {
     const pendentes = await api("/reconciliation/pending");
     if (!pendentes.length) {
@@ -270,10 +270,10 @@ async function loadConciliacao() {
         return `
         <div class="recon-card">
           <div class="recon-top">
-            <span class="recon-cte">CT-e ${esc(p.cte_numero)} <span class="badge-unidade">${esc(p.unidade || "?")}</span></span>
-            <span style="color:var(--ink-dim)">${esc(p.mes_referencia || "")} · ${esc(p.cliente || "")} · ${p.receita !== null ? brl(p.receita) : ""}</span>
+            <span class="recon-cte"><span class="radar-light radar-light--pending"></span>CT-e ${esc(p.cte_numero)} <span class="badge-unidade">${esc(p.unidade || "?")}</span></span>
+            <span class="recon-meta">${esc(p.mes_referencia || "")} · ${esc(p.cliente || "")} · ${p.receita !== null ? brl(p.receita) : ""}</span>
           </div>
-          ${candidatos || '<p style="color:var(--ink-dim);font-size:0.85rem">Nenhum candidato automático — buscar manualmente ou marcar sem custo de terceiro.</p>'}
+          ${candidatos || '<p class="recon-no-candidate"><span class="radar-light radar-light--unknown" style="margin-right:7px"></span>Nenhum candidato automático — buscar manualmente ou marcar sem custo de terceiro.</p>'}
           <button data-link="${p.id}" data-contrato="" class="resolver-btn secondary" style="margin-top:8px">Sem custo de terceiro identificável</button>
         </div>`;
       })
@@ -341,15 +341,33 @@ async function uploadFiles(fileList) {
 }
 
 // ---------------- helpers ----------------
+
+// Margem: nunca um R$0 mudo. Confirmada = luz verde + valor. Não determinável
+// (custo de terceiro ainda sem alocação confirmada) = luz âmbar oca + rótulo
+// explícito — mesmo vocabulário de "pendente" usado na fila de conciliação.
+function margemCell(d) {
+  if (d.viagens_com_custo_alocado) {
+    return `<span class="margem-cell"><span class="radar-light radar-light--ok"></span>${brl(d.margem_total)}</span>`;
+  }
+  return `<span class="margem-cell"><span class="radar-light radar-light--pending"></span><span class="margem-indeterminavel">não determinável</span></span>`;
+}
+
+function scanning(label) {
+  return `<div class="scanning"><span class="radar-light radar-light--pending"></span>${esc(label)}…</div>`;
+}
+
 function emptyState(title, sub) {
   return `<div class="empty-state">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M8 15 L8 11 M12 15 L12 8 M16 15 L16 12"/></svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/><path d="M12 3 L12 6 M12 18 L12 21 M3 12 L6 12 M18 12 L21 12"/></svg>
     <div>${esc(title)}</div>
-    ${sub ? `<div style="font-size:0.82rem;margin-top:4px">${esc(sub)}</div>` : ""}
+    ${sub ? `<div style="font-size:0.82rem;margin-top:4px;color:var(--ink-tertiary)">${esc(sub)}</div>` : ""}
   </div>`;
 }
 function errorState(e) {
-  return `<div class="empty-state"><div style="color:var(--danger)">Erro ao carregar: ${esc(e.message)}</div></div>`;
+  return `<div class="empty-state">
+    <span class="radar-light radar-light--alert" style="width:12px;height:12px;margin-bottom:14px"></span>
+    <div style="color:var(--status-alert)">Erro ao carregar: ${esc(e.message)}</div>
+  </div>`;
 }
 
 // carga inicial
