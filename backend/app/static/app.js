@@ -35,6 +35,7 @@ function loadView(view) {
   if (view === "comparativo") loadComparativo();
   if (view === "desvios") loadDesviosFilters();
   if (view === "conciliacao") loadConciliacao();
+  if (view === "frota") loadFrota();
 }
 
 // ---------------- visão geral ----------------
@@ -298,6 +299,80 @@ async function loadConciliacao() {
   } catch (e) {
     el.innerHTML = errorState(e);
   }
+}
+
+// ---------------- frota própria ----------------
+async function loadFrota() {
+  const el = document.getElementById("frota-content");
+  el.innerHTML = scanning("Sincronizando dado");
+  try {
+    const dados = await api("/analytics/frota");
+    if (!dados.veiculos.length) {
+      el.innerHTML = emptyState("Nenhum veículo de frota própria encontrado no dado importado.");
+      return;
+    }
+
+    const receitaTotal = dados.veiculos.reduce((s, v) => s + v.receita_total, 0);
+    const viagensTotal = dados.veiculos.reduce((s, v) => s + v.viagens, 0);
+
+    const rows = dados.veiculos
+      .map(
+        (v) => `
+      <tr>
+        <td><span class="mono">${esc(v.placa)}</span></td>
+        <td>${v.unidades.map((u) => `<span class="badge-unidade">${esc(u)}</span>`).join(" ")}</td>
+        <td class="num">${v.viagens}</td>
+        <td class="num">${brl(v.receita_total)}</td>
+        <td class="num">${custoIndeterminavelCell()}</td>
+        <td class="num">${custoIndeterminavelCell()}</td>
+        <td class="num">${custoIndeterminavelCell()}</td>
+      </tr>`
+      )
+      .join("");
+
+    const agregados = dados.custos_operacionais_agregados
+      .map(
+        (c) => `
+      <tr>
+        <td>${c.categoria === "combustivel" ? "Combustível" : "Manutenção de frota"}</td>
+        <td><span class="badge-unidade">${esc(c.unidade || "?")}</span></td>
+        <td class="num">${c.linhas}</td>
+        <td class="num">${brl(c.valor_total)}</td>
+      </tr>`
+      )
+      .join("");
+
+    el.innerHTML = `
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label">Veículos próprios</div><div class="kpi-value">${dados.veiculos.length}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Viagens</div><div class="kpi-value">${viagensTotal}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Receita total</div><div class="kpi-value gold">${brl(receitaTotal)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Custo direto por veículo</div><div class="kpi-value warn">não determinável</div></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Placa</th><th>Unidade</th><th style="text-align:right">Viagens</th><th style="text-align:right">Receita</th><th style="text-align:right">Combustível</th><th style="text-align:right">Manutenção</th><th style="text-align:right">Pedágio</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <p class="source-note">receita: CTe.veiculo_placa (real) · custo direto por veículo: aguardando relatório com chave de placa — ver nota acima</p>
+
+      <div class="page-header" style="margin-top:32px"><div class="page-title" style="font-size:1rem">Custo operacional real — só agregado, nunca por placa</div></div>
+      <p class="page-sub">O que existe hoje em Contas a Pagar, sem chave de veículo. Mostrado por transparência, não usado no cálculo por placa acima.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Categoria</th><th>Unidade</th><th style="text-align:right">Lançamentos</th><th style="text-align:right">Valor</th></tr></thead>
+          <tbody>${agregados}</tbody>
+        </table>
+      </div>
+    `;
+  } catch (e) {
+    el.innerHTML = errorState(e);
+  }
+}
+
+function custoIndeterminavelCell() {
+  return `<span class="margem-cell"><span class="radar-light radar-light--unknown"></span><span class="margem-indeterminavel">não determinável</span></span>`;
 }
 
 // ---------------- importar ----------------

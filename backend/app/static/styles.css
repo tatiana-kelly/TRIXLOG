@@ -338,6 +338,7 @@ th {
 td { color: var(--ink-dim); }
 td:first-child { color: var(--ink); font-weight: 500; }
 td.num { font-family: var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); }
+.mono { font-family: var(--font-mono); letter-spacing: 0.03em; }
 tbody tr { transition: background-color 100ms var(--ease-out); }
 tbody tr:hover td { background: var(--surface-2); }
 tbody tr:last-child td { border-bottom: none; }

@@ -335,3 +335,19 @@ automaticamente (violaria a regra de nunca inventar dado — mesmo um "conserto"
 clientes canônico futuro, ou reporte à TRIXLOG do problema na exportação de origem.
 
 9. **`Pedágio` pode ou não estar incluso em `Total`/`Subtotal`** — a relação aritmética entre `Valor do Frete + Valor do Frete Peso + Pedágio = Subtotal = Total` não foi confirmada nos dados citados. Antes de montar a DRE por viagem (seção 3.1), validar essa fórmula com uma amostra de linhas reais para não contar Pedágio em duplicidade ou subtraí-lo quando já é repasse líquido.
+
+10. **Custo direto por veículo de frota própria não tem chave nos relatórios atuais — RESOLVIDO
+como gap explícito, não como estimativa.** Auditoria pedida pela Tatiana (2026-08-15): a
+TRIXLOG opera 5 veículos próprios confirmados nos CT-e's reais (placas TBI2D64, TBI2D63,
+RTO6I76, RTO6I77, RME4C95 — `CTe.proprietario_veiculo_nome` em {"TRIXLOG TRANSPORTES LTDA",
+"AP TUPY TRES CORACOES LTDA" — a segunda confirmada pela Tatiana como a própria TRIXLOG, não
+um agregado}). A receita por placa é real e confiável porque o CT-e carrega a placa. O custo
+direto (combustível R$ 382.389,70 e manutenção R$ 36.741,93 no trimestre, categorias reais em
+`PagamentoFornecedor.centro_custo`) **não tem nenhuma referência de placa** — só posto/oficina
++ valor + data. Pedágio pago pela frota nas estradas (custo, distinto do `CTe.pedagio` que é
+cobrado do cliente e é receita repassada) **não existe em nenhum lançamento** dos 3 relatórios
+recebidos até agora. Ver `app/services/fleet_analytics.py` — nunca ratear esses custos
+agregados por veículo sem uma chave real; a tela "Frota própria" mostra "não determinável"
+explicitamente em vez de estimar. **Dado pendente para fechar esta análise**: um relatório com
+placa por lançamento (cartão-combustível, telemetria/rastreador, ou controle de manutenção por
+veículo, e um relatório de pedágio pago pela frota).
