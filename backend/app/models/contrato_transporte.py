@@ -14,7 +14,10 @@ class ContratoTransporte(Base):
     __tablename__ = "contratos_transporte"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    contrato_numero: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+    contrato_numero: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    # matriz e filial podem reutilizar a mesma faixa de numeração de contrato — a chave real é
+    # (contrato_numero, unidade), não contrato_numero sozinho.
+    unidade: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     fornecedor_nome: Mapped[str | None] = mapped_column(String, nullable=True)
     valor_adiantamento: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False, default=0)
     valor_saldo: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False, default=0)

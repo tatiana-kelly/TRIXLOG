@@ -19,6 +19,7 @@ class PagamentoFornecedor(Base):
     __tablename__ = "pagamentos_fornecedor"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    numero_documento_original: Mapped[str | None] = mapped_column(String, nullable=True, index=True)  # coluna real "Nº Documento"
     fornecedor_nome: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     centro_custo: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     valor: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False, default=0)
@@ -34,4 +35,9 @@ class PagamentoFornecedor(Base):
     tipo_documento: Mapped[str] = mapped_column(String, nullable=False, default="outro")
     numero_documento: Mapped[str | None] = mapped_column(String, nullable=True)
     tipo_parcela: Mapped[str | None] = mapped_column(String, nullable=True)  # adiantamento | saldo
-    filial: Mapped[str | None] = mapped_column(String, nullable=True)
+    filial: Mapped[str | None] = mapped_column(String, nullable=True)  # sub-código "Filial: 002" da Observação
+
+    # matriz | filial — derivado da coluna real "Empresa" (1.0 = matriz, 2.0 = filial). Distinto
+    # do campo `filial` acima, que é um sub-código textual da Observação, não a unidade contábil.
+    unidade: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    arquivo_origem: Mapped[str | None] = mapped_column(String, nullable=True)

@@ -48,3 +48,8 @@ class CTe(Base):
     entrega_status: Mapped[str | None] = mapped_column(String, nullable=True)  # coluna real "Entrega"
     data_entrega: Mapped[date | None] = mapped_column(Date, nullable=True)
     ultima_ocorrencia: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    # matriz | filial — CT-e não tem coluna "Empresa" própria; vem do arquivo de origem
+    # (nome do arquivo exportado, ex. "CT-e matriz julho.xlsx") no momento da importação.
+    unidade: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    arquivo_origem: Mapped[str | None] = mapped_column(String, nullable=True)

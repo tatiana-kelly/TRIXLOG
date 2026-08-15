@@ -5,6 +5,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.models.contrato_transporte import ContratoTransporte
+from app.models.cte import CTe
 from app.models.viagem_link import ViagemLink
 
 router = APIRouter(prefix="/reconciliation", tags=["reconciliation"])
@@ -17,16 +19,38 @@ class ResolveLinkRequest(BaseModel):
 
 @router.get("/pending")
 def list_pending(db: Session = Depends(get_db)) -> list[dict]:
-    """Camada 3 — fila de conciliação manual (docs/COST_ALLOCATION.md#2)."""
+    """Camada 3 — fila de conciliação manual (docs/COST_ALLOCATION.md#2). Junta com CTe para dar
+    contexto real ao operador (cliente, mês, unidade) — cte_numero sozinho é ambíguo entre meses."""
     links = db.query(ViagemLink).filter(ViagemLink.status == "pendente").all()
-    return [
-        {
-            "id": link.id,
-            "cte_numero": link.cte_numero,
-            "candidatos": link.candidatos,
-        }
-        for link in links
-    ]
+    out = []
+    for link in links:
+        cte = db.get(CTe, link.cte_id)
+        candidatos_detalhados = []
+        for numero in link.candidatos:
+            contrato = (
+                db.query(ContratoTransporte)
+                .filter(ContratoTransporte.contrato_numero == numero, ContratoTransporte.unidade == (cte.unidade if cte else None))
+                .first()
+            )
+            candidatos_detalhados.append(
+                {
+                    "contrato_numero": numero,
+                    "fornecedor_nome": contrato.fornecedor_nome if contrato else None,
+                    "valor_total_contrato": float(contrato.valor_total_contrato) if contrato else None,
+                }
+            )
+        out.append(
+            {
+                "id": link.id,
+                "cte_numero": link.cte_numero,
+                "cliente": cte.pagador_frete_nome if cte else None,
+                "unidade": cte.unidade if cte else None,
+                "mes_referencia": cte.data_emissao.strftime("%Y-%m") if cte and cte.data_emissao else None,
+                "receita": float(cte.total) if cte else None,
+                "candidatos": candidatos_detalhados,
+            }
+        )
+    return out
 
 
 @router.post("/{link_id}/resolve")

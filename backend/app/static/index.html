@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TRIXLOG · Torre de Controle</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<div id="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 6 L28 6 L16 28 Z" stroke-linejoin="round"/>
+        <path d="M16 6 L16 20" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <div class="brand-name">Trixlog</div>
+        <div class="brand-tag">Torre de Controle</div>
+      </div>
+    </div>
+
+    <nav class="nav-main">
+      <div class="nav-item active" data-view="visao-geral">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="10" width="4" height="8"/><rect x="8" y="5" width="4" height="13"/><rect x="14" y="2" width="4" height="16"/></svg>
+        Visão geral
+      </div>
+      <div class="nav-item" data-view="rentabilidade">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="7"/><path d="M10 6 L10 10 L13 12"/></svg>
+        Rentabilidade por cliente
+      </div>
+      <div class="nav-item" data-view="comparativo">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 16 L7 9 L11 12 L18 4"/></svg>
+        Comparativo mês a mês
+      </div>
+      <div class="nav-item" data-view="desvios">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 2 L18 17 L2 17 Z" stroke-linejoin="round"/><line x1="10" y1="8" x2="10" y2="12"/><circle cx="10" cy="14.5" r="0.6" fill="currentColor" stroke="none"/></svg>
+        Desvios
+      </div>
+      <div class="nav-item" data-view="conciliacao">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="6" r="2.4"/><circle cx="14" cy="14" r="2.4"/><path d="M7.7 7.7 L12.3 12.3"/></svg>
+        Fila de conciliação
+      </div>
+      <div class="nav-item" data-view="importar">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 13 L10 3 M6 7 L10 3 L14 7" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 15 L3 17 L17 17 L17 15"/></svg>
+        Importar relatórios
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      desvio → causa → impacto →<br>prioridade → solução → execução
+    </div>
+  </aside>
+
+  <main>
+
+    <!-- ===================== VISÃO GERAL ===================== -->
+    <section class="view active" id="view-visao-geral">
+      <div class="page-header"><div class="page-title">Visão geral</div></div>
+      <p class="page-sub">Estado real do dado importado — nenhuma análise deste sistema é mostrada sem dizer a origem e o período.</p>
+      <div id="visao-geral-content">Carregando…</div>
+    </section>
+
+    <!-- ===================== RENTABILIDADE ===================== -->
+    <section class="view" id="view-rentabilidade">
+      <div class="page-header"><div class="page-title">Rentabilidade por cliente</div></div>
+      <p class="page-sub">Custo alocado só aparece quando confirmado (regex, heurística ou conciliação manual). Viagem sem custo alocado nunca vira margem "líquida" fictícia.</p>
+      <div class="filters-row">
+        <select id="rent-mes"></select>
+        <select id="rent-unidade">
+          <option value="">Matriz + Filial</option>
+          <option value="matriz">Matriz</option>
+          <option value="filial">Filial</option>
+        </select>
+      </div>
+      <div id="rentabilidade-content">Carregando…</div>
+    </section>
+
+    <!-- ===================== COMPARATIVO ===================== -->
+    <section class="view" id="view-comparativo">
+      <div class="page-header"><div class="page-title">Comparativo mês a mês</div></div>
+      <p class="page-sub">Receita por cliente, lado a lado, em todos os meses com dado importado.</p>
+      <div class="filters-row">
+        <select id="comp-unidade">
+          <option value="">Matriz + Filial</option>
+          <option value="matriz">Matriz</option>
+          <option value="filial">Filial</option>
+        </select>
+      </div>
+      <div id="comparativo-content">Carregando…</div>
+    </section>
+
+    <!-- ===================== DESVIOS ===================== -->
+    <section class="view" id="view-desvios">
+      <div class="page-header"><div class="page-title">Desvios</div></div>
+      <p class="page-sub">Variação material de receita por cliente entre dois meses (impacto absoluto ≥ R$ 1.000 <em>e</em> variação ≥ 20%). Isto detecta e quantifica — não atribui causa.</p>
+      <div class="filters-row">
+        <select id="desvio-mes-anterior"></select>
+        <span style="color:var(--ink-dim)">→</span>
+        <select id="desvio-mes-atual"></select>
+        <select id="desvio-unidade">
+          <option value="">Matriz + Filial</option>
+          <option value="matriz">Matriz</option>
+          <option value="filial">Filial</option>
+        </select>
+        <button id="desvio-buscar">Detectar desvios</button>
+      </div>
+      <div id="desvios-content"></div>
+    </section>
+
+    <!-- ===================== CONCILIAÇÃO ===================== -->
+    <section class="view" id="view-conciliacao">
+      <div class="page-header"><div class="page-title">Fila de conciliação manual</div></div>
+      <p class="page-sub">CT-e's sem custo de terceiro vinculado com confiança automática — a Camada 3 do Cost Allocation Engine. Este é o caminho principal, não um caso raro.</p>
+      <div id="conciliacao-content">Carregando…</div>
+    </section>
+
+    <!-- ===================== IMPORTAR ===================== -->
+    <section class="view" id="view-importar">
+      <div class="page-header"><div class="page-title">Importar relatórios</div></div>
+      <p class="page-sub">Solte um ou mais arquivos .xlsx (CT-e, Contas a Receber, Contas a Pagar — matriz ou filial, qualquer mês). O tipo e a unidade são detectados automaticamente.</p>
+      <div class="dropzone" id="dropzone">
+        <div>Arraste os arquivos aqui, ou <strong style="color:var(--gold)">clique para escolher</strong></div>
+        <input type="file" id="file-input" multiple accept=".xlsx" style="display:none">
+      </div>
+      <div class="upload-log" id="upload-log">Nenhuma importação executada nesta sessão ainda.</div>
+    </section>
+
+  </main>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

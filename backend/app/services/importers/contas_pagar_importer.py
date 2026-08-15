@@ -1,13 +1,18 @@
-"""Importador de Contas a Pagar — fonte real: examples/contas_pagar_real.xlsx.
+"""Importador de Contas a Pagar — aceita qualquer relatório real da TRIXLOG (matriz ou filial,
+qualquer mês; confirmado layout idêntico nos 18 relatórios reais de maio/junho/julho).
 
 Classifica cada linha em 1 de 3 tipos reais de documento encontrados em Observação
-(confirmado sobre as 79 linhas completas, não uma amostra):
+(confirmado sobre as 79 linhas completas do primeiro lote, não uma amostra):
 - "Contrato de Transporte número NN" (Adiantamento | Saldo) — custo de frete terceiro,
   sempre com Centro de Custo = "FRETES TERCEIROS" (20/20 linhas bateram nos dois lados).
 - "Nota de Entrada número NNN" — compra/insumo (combustível, manutenção, software, etc.),
   não é custo de frete por viagem.
 - "Antecipação de recebíveis" — operação financeira/factoring, não é despesa de frete.
 Linha sem nenhum desses três padrões vira tipo_documento="outro".
+
+`unidade` (matriz|filial) é derivada da coluna real "Empresa" (1.0=matriz, 2.0=filial).
+Idempotente por arquivo: reimportar o mesmo arquivo_origem não duplica — Nº Documento se repete
+entre meses nos relatórios reais, então não é chave global segura sozinho.
 """
 
 import re
@@ -22,6 +27,8 @@ from app.services.importers.cte_importer import ImportResult
 _CONTRATO_RE = re.compile(r"Contrato de Transporte número (\d+)", re.IGNORECASE)
 _NOTA_ENTRADA_RE = re.compile(r"Nota de Entrada número (\d+)", re.IGNORECASE)
 _FILIAL_RE = re.compile(r"Filial:\s*(\d+)", re.IGNORECASE)
+
+_EMPRESA_CODE_TO_UNIDADE = {"1": "matriz", "2": "filial"}
 
 
 def classify_observacao(observacao: str | None) -> dict:
@@ -63,7 +70,14 @@ def classify_observacao(observacao: str | None) -> dict:
     return {"tipo_documento": "outro", "numero_documento": None, "tipo_parcela": None, "filial": filial}
 
 
-def import_contas_pagar(path: str, db: Session) -> ImportResult:
+def _resolve_unidade(row, fallback: str | None) -> str | None:
+    codigo = float_id_to_str(row.get("Empresa"))
+    return _EMPRESA_CODE_TO_UNIDADE.get(codigo, fallback)
+
+
+def import_contas_pagar(
+    path: str, db: Session, unidade: str | None = None, arquivo_origem: str | None = None
+) -> ImportResult:
     df = pd.read_excel(path)
     result = ImportResult()
 
@@ -74,10 +88,28 @@ def import_contas_pagar(path: str, db: Session) -> ImportResult:
             result.rejected_reasons.append(f"linha {idx}: sem Fornecedor")
             continue
 
+        numero_documento_original = float_id_to_str(row.get("Nº Documento"))
+        row_unidade = _resolve_unidade(row, unidade)
+
+        if numero_documento_original and arquivo_origem:
+            existing = (
+                db.query(PagamentoFornecedor)
+                .filter(
+                    PagamentoFornecedor.numero_documento_original == numero_documento_original,
+                    PagamentoFornecedor.unidade == row_unidade,
+                    PagamentoFornecedor.arquivo_origem == arquivo_origem,
+                )
+                .first()
+            )
+            if existing:
+                result.skipped_duplicate += 1
+                continue
+
         observacao = clean_str(row.get("Observação"))
         classification = classify_observacao(observacao)
 
         pagamento = PagamentoFornecedor(
+            numero_documento_original=numero_documento_original,
             fornecedor_nome=fornecedor,
             centro_custo=clean_str(row.get("Centro de Custo")),
             valor=to_float(row.get("Valor")),
@@ -90,6 +122,8 @@ def import_contas_pagar(path: str, db: Session) -> ImportResult:
             numero_documento=classification["numero_documento"],
             tipo_parcela=classification["tipo_parcela"],
             filial=classification["filial"],
+            unidade=row_unidade,
+            arquivo_origem=arquivo_origem,
         )
         db.add(pagamento)
         result.imported += 1

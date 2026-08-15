@@ -312,4 +312,12 @@ Todos abaixo usam exclusivamente colunas já confirmadas nas 3 planilhas:
 5. **Duas séries numéricas desconexas (CT-e vs. Contrato de Transporte).** Confirmado nos dados de exemplo (contratos 68/69 vs. CT-e's 24/382/384/385/386) — não há relação aritmética ou de intervalo aparente entre as séries, então nenhuma heurística baseada em proximidade numérica é viável; só nome/data/valor.
 6. **Ausência de campo de data em `Contas Pagar.xlsx`** (não foi citada nenhuma coluna de data nessa planilha, diferente de CT-e e Contas Receber). Isso enfraquece a Camada 2 (heurística por janela de data), pois não há certeza de que exista uma data de pagamento/lançamento utilizável — **PREMISSA A VALIDAR**: confirmar com a planilha real se existe coluna de data em Contas Pagar não mencionada no escopo desta tarefa.
 7. **Fatura sem número de identificação explícito.** As colunas listadas para Contas Receber não incluem um "Número da Fatura" — apenas Cliente + Observação + valores. Se não existir, cada fatura precisa de uma chave substituta (surrogate), o que é aceitável, mas dificulta rastreabilidade externa (ex. conferência com o cliente).
-8. **`Pedágio` pode ou não estar incluso em `Total`/`Subtotal`** — a relação aritmética entre `Valor do Frete + Valor do Frete Peso + Pedágio = Subtotal = Total` não foi confirmada nos dados citados. Antes de montar a DRE por viagem (seção 3.1), validar essa fórmula com uma amostra de linhas reais para não contar Pedágio em duplicidade ou subtraí-lo quando já é repasse líquido.
+8b. **Nome de cliente inconsistente entre lançamentos** — confirmado no lote de 18 relatórios
+reais (maio/junho/julho): "MINERVA S.A." e "MINERVA S A" aparecem como duas linhas separadas no
+ranking de rentabilidade por cliente, sendo claramente a mesma empresa (pontuação/espaçamento
+diferente). Isso distorce Pareto e concentração de receita se não for tratado. **Decisão
+deliberada de não normalizar automaticamente** (nunca inventar/inferir identidade sem uma regra
+seguramente validada) — fica registrado como gap a resolver com um cadastro de clientes
+canônico (de-para) quando houver tempo, não com fuzzy-match automático.
+
+9. **`Pedágio` pode ou não estar incluso em `Total`/`Subtotal`** — a relação aritmética entre `Valor do Frete + Valor do Frete Peso + Pedágio = Subtotal = Total` não foi confirmada nos dados citados. Antes de montar a DRE por viagem (seção 3.1), validar essa fórmula com uma amostra de linhas reais para não contar Pedágio em duplicidade ou subtraí-lo quando já é repasse líquido.

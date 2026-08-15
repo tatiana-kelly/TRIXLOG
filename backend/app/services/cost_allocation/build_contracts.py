@@ -21,9 +21,13 @@ def build_contratos_transporte(db: Session) -> int:
         .all()
     )
 
-    grouped: dict[str, dict] = defaultdict(lambda: {"adiantamento": 0.0, "saldo": 0.0, "fornecedor_nome": None})
+    # chave (numero, unidade) — matriz e filial podem reutilizar a mesma faixa de numeração.
+    grouped: dict[tuple[str, str | None], dict] = defaultdict(
+        lambda: {"adiantamento": 0.0, "saldo": 0.0, "fornecedor_nome": None}
+    )
     for p in pagamentos:
-        bucket = grouped[p.numero_documento]
+        key = (p.numero_documento, p.unidade)
+        bucket = grouped[key]
         if p.tipo_parcela == "adiantamento":
             bucket["adiantamento"] += float(p.valor)
         elif p.tipo_parcela == "saldo":
@@ -33,9 +37,10 @@ def build_contratos_transporte(db: Session) -> int:
     db.query(ContratoTransporte).delete()
 
     created = 0
-    for numero, data in grouped.items():
+    for (numero, unidade), data in grouped.items():
         contrato = ContratoTransporte(
             contrato_numero=numero,
+            unidade=unidade,
             fornecedor_nome=data["fornecedor_nome"],
             valor_adiantamento=data["adiantamento"],
             valor_saldo=data["saldo"],

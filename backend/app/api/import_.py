@@ -1,35 +1,128 @@
+import shutil
+import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, UploadFile
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.models.cte import CTe
+from app.models.fatura_receber import FaturaReceber
+from app.models.pagamento_fornecedor import PagamentoFornecedor
 from app.services.cost_allocation.build_contracts import build_contratos_transporte
 from app.services.cost_allocation.heuristic_link import run_camada2
 from app.services.importers.contas_pagar_importer import import_contas_pagar
 from app.services.importers.contas_receber_importer import import_contas_receber
 from app.services.importers.cte_importer import import_cte
+from app.services.importers.report_detector import detect_report_type, guess_unidade_from_filename
 
 router = APIRouter(prefix="/import", tags=["import"])
 
 EXAMPLES_DIR = Path(__file__).resolve().parents[3] / "examples"
 
+_IMPORTERS = {
+    "cte": import_cte,
+    "contas_receber": import_contas_receber,
+    "contas_pagar": import_contas_pagar,
+}
 
-@router.post("/run")
-def run_import(db: Session = Depends(get_db)) -> dict:
-    """Importa os 3 relatórios reais de examples/ e roda as camadas 1 e 2 do Cost Allocation
-    Engine. Endpoint de conveniência para a Fase 0 — troca para upload de arquivo na Fase 1."""
-    cte_result = import_cte(str(EXAMPLES_DIR / "cte_real.xlsx"), db)
-    ar_result = import_contas_receber(str(EXAMPLES_DIR / "contas_receber_real.xlsx"), db)
-    ap_result = import_contas_pagar(str(EXAMPLES_DIR / "contas_pagar_real.xlsx"), db)
 
+def _rebuild_cost_allocation(db: Session) -> dict:
+    """Reconstrói ContratoTransporte e reroda a Camada 2 sobre TODO o dado já importado —
+    precisa rodar de novo a cada novo arquivo, já que um CT-e importado antes pode agora ter
+    candidato num contrato que só chegou neste upload."""
     contratos_criados = build_contratos_transporte(db)
     camada2_stats = run_camada2(db)
+    return {"contratos_transporte_construidos": contratos_criados, "camada2_cost_allocation": camada2_stats}
+
+
+@router.post("/upload")
+async def upload_reports(
+    files: list[UploadFile] = File(...),
+    unidade: str | None = None,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Botão de importação da plataforma. Aceita 1+ arquivos .xlsx de uma vez (CT-e, Contas a
+    Receber, Contas a Pagar, matriz ou filial, qualquer mês — o tipo é detectado pela assinatura
+    de colunas, a unidade pela coluna real "Empresa" quando existir, senão pelo nome do arquivo,
+    senão pelo parâmetro `unidade` se o usuário informar).
+
+    Sem chave de sistema de origem: cada arquivo vira `arquivo_origem` no banco, e reimportar o
+    mesmo arquivo não duplica (idempotente por nome de arquivo, ver docs/COST_ALLOCATION.md#6 —
+    Nº Documento e Número de CT-e se repetem entre meses, não são chave global segura).
+    """
+    resultados = []
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        for upload in files:
+            tmp_path = Path(tmp_dir) / upload.filename
+            with tmp_path.open("wb") as f:
+                shutil.copyfileobj(upload.file, f)
+
+            deteccao = detect_report_type(str(tmp_path))
+            if deteccao.tipo_relatorio is None:
+                resultados.append({"arquivo": upload.filename, "erro": deteccao.motivo})
+                continue
+
+            unidade_arquivo = unidade or guess_unidade_from_filename(upload.filename)
+            importer = _IMPORTERS[deteccao.tipo_relatorio]
+            import_result = importer(str(tmp_path), db, unidade=unidade_arquivo, arquivo_origem=upload.filename)
+
+            resultados.append(
+                {
+                    "arquivo": upload.filename,
+                    "tipo_detectado": deteccao.tipo_relatorio,
+                    "unidade_detectada": unidade_arquivo,
+                    "importados": import_result.imported,
+                    "ja_importados_antes": import_result.skipped_duplicate,
+                    "rejeitados": import_result.rejected,
+                    "motivos_rejeicao": import_result.rejected_reasons,
+                }
+            )
+
+    cost_allocation = _rebuild_cost_allocation(db)
+
+    return {"arquivos": resultados, **cost_allocation}
+
+
+@router.get("/status")
+def import_status(db: Session = Depends(get_db)) -> dict:
+    """Resumo do que já foi importado — fonte de dados e período coberto, para a plataforma
+    mostrar isso em cada módulo (nunca apresentar análise sem dizer de onde/quando veio)."""
+
+    def _resumo_meses(model, date_field):
+        rows = (
+            db.query(func.strftime("%Y-%m", date_field), model.unidade, func.count())
+            .group_by(func.strftime("%Y-%m", date_field), model.unidade)
+            .all()
+        )
+        return [{"mes": mes, "unidade": unidade, "quantidade": qtd} for mes, unidade, qtd in rows if mes]
+
+    return {
+        "cte": {"total": db.query(CTe).count(), "por_mes_unidade": _resumo_meses(CTe, CTe.data_emissao)},
+        "contas_receber": {"total": db.query(FaturaReceber).count()},
+        "contas_pagar": {"total": db.query(PagamentoFornecedor).count()},
+    }
+
+
+@router.post("/run")
+def run_import_examples(db: Session = Depends(get_db)) -> dict:
+    """Atalho de desenvolvimento: reimporta os 3 relatórios originais de examples/*_real.xlsx
+    (mês de referência: julho, matriz). Para o fluxo real, usar POST /import/upload."""
+    cte_result = import_cte(str(EXAMPLES_DIR / "cte_real.xlsx"), db, unidade="matriz", arquivo_origem="cte_real.xlsx")
+    ar_result = import_contas_receber(
+        str(EXAMPLES_DIR / "contas_receber_real.xlsx"), db, unidade="matriz", arquivo_origem="contas_receber_real.xlsx"
+    )
+    ap_result = import_contas_pagar(
+        str(EXAMPLES_DIR / "contas_pagar_real.xlsx"), db, unidade="matriz", arquivo_origem="contas_pagar_real.xlsx"
+    )
+
+    cost_allocation = _rebuild_cost_allocation(db)
 
     return {
         "cte": {"importados": cte_result.imported, "rejeitados": cte_result.rejected, "motivos": cte_result.rejected_reasons},
         "contas_receber": {"importados": ar_result.imported, "rejeitados": ar_result.rejected, "motivos": ar_result.rejected_reasons},
         "contas_pagar": {"importados": ap_result.imported, "rejeitados": ap_result.rejected, "motivos": ap_result.rejected_reasons},
-        "contratos_transporte_construidos": contratos_criados,
-        "camada2_cost_allocation": camada2_stats,
+        **cost_allocation,
     }

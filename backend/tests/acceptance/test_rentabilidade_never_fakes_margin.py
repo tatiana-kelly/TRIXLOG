@@ -36,9 +36,10 @@ def test_viagem_sem_link_fica_nao_alocada(db_session):
 def test_viagem_pendente_link_tambem_fica_nao_alocada(db_session):
     """Um ViagemLink existente mas status='pendente' (Camada 2 ambígua) não deve ser tratado
     como resolvido, mesmo que tenha candidatos sugeridos."""
-    _make_cte(db_session, "412", "AGROVALE INDÚSTRIA LTDA", 7200.0)
+    cte = _make_cte(db_session, "412", "AGROVALE INDÚSTRIA LTDA", 7200.0)
     db_session.add(
         ViagemLink(
+            cte_id=cte.id,
             cte_numero="412",
             metodo_vinculo="nao_vinculado",
             confianca_vinculo=0.0,
@@ -55,10 +56,11 @@ def test_viagem_pendente_link_tambem_fica_nao_alocada(db_session):
 
 
 def test_viagem_com_link_resolvido_calcula_margem_real(db_session):
-    _make_cte(db_session, "500", "FRIGORIFICO SUL LTDA", 10000.0)
+    cte = _make_cte(db_session, "500", "FRIGORIFICO SUL LTDA", 10000.0)
     db_session.add(ContratoTransporte(contrato_numero="99", fornecedor_nome="X TRANSPORTES", valor_total_contrato=6000.0))
     db_session.add(
         ViagemLink(
+            cte_id=cte.id,
             cte_numero="500",
             contrato_transporte_numero="99",
             metodo_vinculo="manual",

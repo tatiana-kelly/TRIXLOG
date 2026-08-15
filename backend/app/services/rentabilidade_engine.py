@@ -18,6 +18,8 @@ from app.models.viagem_link import ViagemLink
 class ViagemRentabilidade:
     cte_numero: str
     cliente: str
+    unidade: str | None
+    mes_referencia: str | None  # "YYYY-MM", derivado de CTe.data_emissao
     receita: float
     custo_alocado: float | None
     margem: float | None
@@ -35,22 +37,39 @@ class RentabilidadeCliente:
     viagens: list[ViagemRentabilidade] = field(default_factory=list)
 
 
-def calcular_rentabilidade_por_cliente(db: Session) -> list[RentabilidadeCliente]:
-    contratos_by_numero = {c.contrato_numero: c for c in db.query(ContratoTransporte).all()}
-    links_by_cte = {link.cte_numero: link for link in db.query(ViagemLink).all()}
+def _mes_referencia(cte: CTe) -> str | None:
+    return cte.data_emissao.strftime("%Y-%m") if cte.data_emissao else None
+
+
+def calcular_rentabilidade_por_cliente(
+    db: Session, mes_referencia: str | None = None, unidade: str | None = None
+) -> list[RentabilidadeCliente]:
+    """mes_referencia: filtra por "YYYY-MM" (baseado em CTe.data_emissao). unidade: filtra por
+    "matriz"|"filial". Sem filtros, agrega tudo que foi importado até agora."""
+    # chave (numero, unidade) — matriz e filial reutilizam a mesma faixa de numeração de contrato.
+    contratos_by_key = {(c.contrato_numero, c.unidade): c for c in db.query(ContratoTransporte).all()}
+    links_by_cte_id = {link.cte_id: link for link in db.query(ViagemLink).all()}
 
     por_cliente: dict[str, RentabilidadeCliente] = {}
 
-    for cte in db.query(CTe).all():
+    query = db.query(CTe)
+    if unidade:
+        query = query.filter(CTe.unidade == unidade)
+
+    for cte in query.all():
+        cte_mes = _mes_referencia(cte)
+        if mes_referencia and cte_mes != mes_referencia:
+            continue
+
         cliente = cte.pagador_frete_nome
         bucket = por_cliente.setdefault(cliente, RentabilidadeCliente(cliente=cliente))
 
-        link = links_by_cte.get(cte.cte_numero)
+        link = links_by_cte_id.get(cte.id)
         custo_alocado = None
         status_alocacao = "pendente"
 
         if link and link.status == "resolvido" and link.contrato_transporte_numero:
-            contrato = contratos_by_numero.get(link.contrato_transporte_numero)
+            contrato = contratos_by_key.get((link.contrato_transporte_numero, cte.unidade))
             if contrato:
                 custo_alocado = float(contrato.valor_total_contrato)
                 status_alocacao = "resolvido"
@@ -62,6 +81,8 @@ def calcular_rentabilidade_por_cliente(db: Session) -> list[RentabilidadeCliente
             ViagemRentabilidade(
                 cte_numero=cte.cte_numero,
                 cliente=cliente,
+                unidade=cte.unidade,
+                mes_referencia=cte_mes,
                 receita=receita,
                 custo_alocado=custo_alocado,
                 margem=margem,
