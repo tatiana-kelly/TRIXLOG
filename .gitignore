@@ -10,3 +10,4 @@ __pycache__/
 # Editores/SO
 .DS_Store
 Thumbs.db
+*.db

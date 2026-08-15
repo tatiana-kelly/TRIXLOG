@@ -3,6 +3,28 @@
 
 ---
 
+## 0. Cobertura real medida (Fase 0, `backend/scripts/run_real_import.py` contra os 3 arquivos completos)
+
+- Importação: 67/68 CT-e, 45/46 Contas a Receber, 78/79 Contas a Pagar (1 linha rejeitada em
+  cada por falta de campo obrigatório — coerente entre os três).
+- Camada 1 (Fatura → CT-e via Observação): 45/45 faturas importadas têm ao menos 1 Conhecimento
+  referenciado. 69 referências no total, 4 sem CT-e correspondente no arquivo (provavelmente
+  fora do período exportado).
+- Contas a Pagar por tipo real: 20 `contrato_transporte`, 57 `nota_entrada`, 1
+  `antecipacao_recebiveis` — nenhuma linha caiu em "outro" (o parser cobre 100% do formato real).
+- 12 `ContratoTransporte` reconstruídos.
+- **Camada 2 (heurística nome+data, com trava de 1 contrato = 1 CT-e): 3/67 CT-e's (4,5%)
+  vinculados automaticamente. 95,5% caem para a Camada 3 (conciliação manual).** Isso é mais
+  pessimista ainda que o achado de "2/79 coincidências numéricas" de uma auditoria independente
+  — e é o número certo, não uma estimativa: a primeira versão da heurística permitia que o mesmo
+  contrato fosse "encontrado" por vários CT-e's do mesmo transportador na mesma janela, inflando
+  o custo alocado (ex.: LOJAS EDMIL S/A chegou a mostrar custo_alocado 4x maior que a receita)
+  até a trava de reivindicação única ser adicionada. **Conclusão prática: a fila de conciliação
+  manual (Camada 3) não é um fallback raro — é o caminho principal. Investir ali, não em deixar
+  a heurística "mais esperta".**
+
+---
+
 ## 1. Modelo de Dados Canônico Proposto
 
 ### 1.1 Entidade: `CTe` (Receita — fonte: **CT-e.xlsx**, 68 linhas)
@@ -134,7 +156,18 @@ Não existe fonte primária — é o resultado do processo de conciliação (se�
 
 Quando a Camada 1 não fecha o elo `CTe ↔ ContratoTransporte`, aplicar heurística por similaridade de atributos:
 
-- **Match candidato:** mesma janela de datas (`ContratoTransporte` não tem data própria nestes exports — usar `Data de Emissão`/`Data de Entrega` do CT-e vs. a data do lançamento em Contas Pagar, se existir campo de data não listado — **PREMISSA A VALIDAR**, os campos de data em Contas Pagar não foram confirmados no escopo desta planilha) **+** mesmo `fornecedor_nome`/`favorecido_nome` aproximando-se do `motorista_nome` ou `proprietario_veiculo_nome` do CT-e (fuzzy match de nome, já que motorista PF pode aparecer com grafia distinta em cada sistema).
+- **Match candidato:** mesma janela de datas — **corrigido após inspeção da planilha completa**:
+  Contas Pagar TEM campos de data (`Dt. Emissão`, `Dt. Movimento`, `Dt. Vencimento`, `Dt. Pagamento`,
+  `Dt. Lançamento`), ao contrário do que uma leitura por amostra pequena sugeriu antes — usar
+  `Dt. Emissão` do pagamento vs. `Data de Emissão` do CT-e, janela de poucos dias **+** mesmo
+  `fornecedor_nome`/`favorecido_nome` aproximando-se do `motorista_nome` ou `proprietario_veiculo_nome`
+  do CT-e (fuzzy match de nome, já que motorista PF pode aparecer com grafia distinta em cada sistema).
+- **Achado empírico (auditoria independente rodada contra os 3 arquivos completos):** apenas
+  **2 de 79 linhas de Contas a Pagar** apresentaram coincidência numérica segura com um CT-e.
+  Ou seja, a Camada 2 deve ser tratada como **raramente decisiva na prática**, não como fallback
+  intermediário robusto — a maioria dos casos vai cair direto na Camada 3 (conciliação manual).
+  Dimensionar o esforço de engenharia de acordo: investir mais na qualidade da fila de conciliação
+  manual (Camada 3) do que em sofisticar a heurística automática.
 - **Confiabilidade: baixa a média.** Nomes de motorista/transportador podem se repetir para vários CT-e's na mesma semana (um motorista roda várias cargas), então "mesmo fornecedor + mesma janela de data" pode gerar **match ambíguo N:N**, não 1:1. Placa de veículo (`Veículo - Placa` no CT-e) seria o sinal mais forte, mas não existe campo de placa em Contas Pagar — então essa heurística exige nome como proxy, que é o campo mais sujeito a erro de digitação/variação (ex. "MAIOLINI TRANSPORTES LTDA" vs. nome do motorista pessoa física dirigindo para esse mesmo proprietário).
 - Regra de negócio: só aceitar automaticamente um match de Camada 2 se houver exatamente 1 candidato dentro da janela (data + nome). Se houver mais de 1 candidato, cai para Camada 3 obrigatoriamente — nunca decidir automaticamente em caso de ambiguidade.
 
