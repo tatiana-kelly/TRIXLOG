@@ -11,6 +11,7 @@ from app.services.monthly_analytics import (
     listar_meses_disponiveis,
     rentabilidade_mensal_por_cliente,
 )
+from app.services.rotas_analytics import calcular_rentabilidade_por_rota
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -129,6 +130,25 @@ def decisoes(unidade: str | None = None, db: Session = Depends(get_db)) -> list[
             "kpi_validacao": d.kpi_validacao,
         }
         for d in itens
+    ]
+
+
+@router.get("/rotas")
+def rotas(mes: str | None = None, unidade: str | None = None, db: Session = Depends(get_db)) -> list[dict]:
+    """Rentabilidade por rota (origem → destino) — ver app/services/rotas_analytics.py."""
+    itens = calcular_rentabilidade_por_rota(db, mes_referencia=mes, unidade=unidade)
+    return [
+        {
+            "origem": r.origem,
+            "destino": r.destino,
+            "qtd_ctes": r.qtd_ctes,
+            "receita_total": r.receita_total,
+            "custo_alocado_total": r.custo_alocado_total,
+            "margem_total": r.margem_total,
+            "viagens_com_custo_alocado": r.viagens_com_custo_alocado,
+            "viagens_pendentes": r.viagens_pendentes,
+        }
+        for r in itens
     ]
 
 

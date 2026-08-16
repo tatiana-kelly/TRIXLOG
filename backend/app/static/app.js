@@ -37,6 +37,7 @@ function loadView(view) {
   if (view === "comparativo") loadComparativo();
   if (view === "desvios") loadDesviosFilters();
   if (view === "conciliacao") loadConciliacao();
+  if (view === "rotas") loadRotas();
   if (view === "frota") loadFrota();
 }
 
@@ -454,6 +455,63 @@ async function loadConciliacao() {
         }
       });
     });
+  } catch (e) {
+    el.innerHTML = errorState(e);
+  }
+}
+
+// ---------------- rotas ----------------
+async function loadRotas() {
+  const mesSel = document.getElementById("rotas-mes");
+  const unidadeSel = document.getElementById("rotas-unidade");
+  if (!mesSel.dataset.loaded) {
+    await populateMonthSelect(mesSel);
+    mesSel.insertAdjacentHTML("afterbegin", `<option value="">Todo o período</option>`);
+    mesSel.value = "";
+    mesSel.dataset.loaded = "1";
+    mesSel.addEventListener("change", renderRotas);
+    unidadeSel.addEventListener("change", renderRotas);
+  }
+  renderRotas();
+}
+
+async function renderRotas() {
+  const el = document.getElementById("rotas-content");
+  const mes = document.getElementById("rotas-mes").value;
+  const unidade = document.getElementById("rotas-unidade").value;
+  el.innerHTML = scanning("Sincronizando dado");
+  try {
+    const qs = new URLSearchParams();
+    if (mes) qs.set("mes", mes);
+    if (unidade) qs.set("unidade", unidade);
+    const rotas = await api(`/analytics/rotas?${qs.toString()}`);
+    if (!rotas.length) {
+      el.innerHTML = emptyState("Nenhuma rota encontrada neste período/unidade.");
+      return;
+    }
+
+    const rows = rotas
+      .map(
+        (r) => `
+      <tr>
+        <td>${esc(r.origem)} → ${esc(r.destino)}</td>
+        <td class="num">${r.qtd_ctes}</td>
+        <td class="num">${brl(r.receita_total)}</td>
+        <td class="num">${r.viagens_com_custo_alocado ? brl(r.custo_alocado_total) : "—"}</td>
+        <td class="num">${margemCell({ viagens_com_custo_alocado: r.viagens_com_custo_alocado, margem_total: r.margem_total })}</td>
+      </tr>`
+      )
+      .join("");
+
+    el.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Rota</th><th style="text-align:right">CT-e's</th><th style="text-align:right">Receita</th><th style="text-align:right">Custo alocado</th><th style="text-align:right">Margem</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <p class="source-note">rota = local de coleta → local de entrega do CT-e · mês: ${mes ? esc(mes) : "todo o período"} · unidade: ${unidade ? esc(unidade) : "matriz + filial"}</p>
+    `;
   } catch (e) {
     el.innerHTML = errorState(e);
   }

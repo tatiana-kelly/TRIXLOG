@@ -49,6 +49,10 @@
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="6" r="2.4"/><circle cx="14" cy="14" r="2.4"/><path d="M7.7 7.7 L12.3 12.3"/></svg>
         Fila de conciliação
       </div>
+      <div class="nav-item" data-view="rotas">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="4" cy="16" r="1.8"/><circle cx="16" cy="4" r="1.8"/><path d="M5.5 15 L11 8 M13 6 L14.5 5" stroke-dasharray="2 2"/></svg>
+        Rotas
+      </div>
       <div class="nav-item" data-view="frota">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="9" width="11" height="6" rx="1"/><path d="M13 11 L16 11 L18 13.5 L18 15 L13 15"/><circle cx="6" cy="16" r="1.6"/><circle cx="15.5" cy="16" r="1.6"/></svg>
         Frota própria
@@ -161,6 +165,21 @@
       <div class="page-header"><div class="page-title">Frota própria — rentabilidade por veículo</div></div>
       <p class="page-sub">Receita é real, direto do CT-e (a placa vai no documento). Custo direto por veículo — combustível, manutenção, pedágio — <strong style="color:var(--ink)">não determinável hoje</strong>: os lançamentos de Contas a Pagar têm posto/oficina e valor, mas nenhuma referência a placa. Aguardando relatório de cartão-combustível, telemetria ou manutenção por veículo para fechar essa análise.</p>
       <div id="frota-content">Carregando…</div>
+    </section>
+
+    <!-- ===================== ROTAS ===================== -->
+    <section class="view" id="view-rotas">
+      <div class="page-header"><div class="page-title">Rotas</div></div>
+      <p class="page-sub">Rentabilidade por origem → destino, direto do local de coleta/entrega do CT-e — sem normalização de cidade inventada.</p>
+      <div class="filters-row">
+        <select id="rotas-mes"></select>
+        <select id="rotas-unidade">
+          <option value="">Matriz + Filial</option>
+          <option value="matriz">Matriz</option>
+          <option value="filial">Filial</option>
+        </select>
+      </div>
+      <div id="rotas-content">Carregando…</div>
     </section>
 
     <!-- ===================== IMPORTAR ===================== -->

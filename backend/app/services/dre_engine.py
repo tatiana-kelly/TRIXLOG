@@ -16,10 +16,9 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
 
-from app.models.contrato_transporte import ContratoTransporte
 from app.models.cte import CTe
 from app.models.pagamento_fornecedor import PagamentoFornecedor
-from app.models.viagem_link import ViagemLink
+from app.services.custo_lookup import custo_confirmado_por_cte
 
 
 @dataclass
@@ -67,26 +66,7 @@ def calcular_dre(db: Session, mes_referencia: str | None = None, unidade: str | 
 
     dre.receita_operacional = sum(float(c.total) for c in ctes)
 
-    cte_ids = {c.id for c in ctes}
-    ctes_por_id = {c.id: c for c in ctes}
-    contratos_por_chave = {(c.contrato_numero, c.unidade): c for c in db.query(ContratoTransporte).all()}
-
-    # Custo confirmado vem de duas fontes possíveis por link resolvido — mesma regra de
-    # rentabilidade_engine.py: custo_direto (Camada 0, join com Carta Frete) tem prioridade;
-    # se não tiver, cai pro contrato (Camada 2). Um link "resolvido" sem nenhuma das duas fontes
-    # não é tratado como confirmado (nunca aconteceu até hoje, mas não assume).
-    links_resolvidos: dict[str, float] = {}
-    for link in db.query(ViagemLink).filter(ViagemLink.status == "resolvido").all():
-        if link.cte_id not in cte_ids:
-            continue
-        if link.custo_direto is not None:
-            links_resolvidos[link.cte_id] = float(link.custo_direto)
-        elif link.contrato_transporte_numero:
-            cte = ctes_por_id[link.cte_id]
-            contrato = contratos_por_chave.get((link.contrato_transporte_numero, cte.unidade))
-            if contrato:
-                links_resolvidos[link.cte_id] = float(contrato.valor_total_contrato)
-
+    links_resolvidos = custo_confirmado_por_cte(db, ctes)
     dre.custo_frete_terceiro_confirmado = sum(links_resolvidos.values())
 
     ctes_pendentes = [c for c in ctes if c.id not in links_resolvidos]
