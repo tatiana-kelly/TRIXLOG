@@ -40,6 +40,7 @@ function loadView(view) {
   if (view === "rotas") loadRotas();
   if (view === "frota") loadFrota();
   if (view === "terceiros") loadTerceiros();
+  if (view === "qualidade") loadQualidade();
 }
 
 // ---------------- visão geral ----------------
@@ -173,9 +174,10 @@ async function loadDRE() {
   renderDRE();
 }
 
-function linhaDRE(label, valor, { destaque, indent } = {}) {
-  return `<tr class="${destaque ? "dre-subtotal" : ""}">
-    <td style="${indent ? "padding-left:28px;color:var(--ink-dim)" : ""}">${esc(label)}</td>
+function linhaDRE(label, valor, { destaque, indent, linha } = {}) {
+  const clicavel = linha ? ` class="dre-linha-auditavel" data-linha="${linha}"` : "";
+  return `<tr class="${destaque ? "dre-subtotal" : ""}"${clicavel}>
+    <td style="${indent ? "padding-left:28px;color:var(--ink-dim)" : ""}">${esc(label)}${linha ? ' <span class="ver-origem">ⓘ ver origem</span>' : ""}</td>
     <td class="num">${brl(valor)}</td>
   </tr>`;
 }
@@ -216,10 +218,10 @@ async function renderDRE() {
       <div class="table-wrap">
         <table class="dre-table">
           <tbody>
-            ${linhaDRE("Receita Operacional (CT-e)", d.receita_operacional, { destaque: true })}
-            ${linhaDRE("Custo direto — frete terceiro (confirmado)", -d.custo_frete_terceiro_confirmado, { indent: true })}
-            ${linhaDRE("Combustível (frota própria)", -d.combustivel, { indent: true })}
-            ${linhaDRE("Manutenção (frota própria)", -d.manutencao, { indent: true })}
+            ${linhaDRE("Receita Operacional (CT-e)", d.receita_operacional, { destaque: true, linha: "receita" })}
+            ${linhaDRE("Custo direto — frete terceiro (confirmado)", -d.custo_frete_terceiro_confirmado, { indent: true, linha: "frete_terceiro" })}
+            ${linhaDRE("Combustível (frota própria)", -d.combustivel, { indent: true, linha: "combustivel" })}
+            ${linhaDRE("Manutenção (frota própria)", -d.manutencao, { indent: true, linha: "manutencao" })}
             ${linhaDRE("= Margem de Contribuição Operacional", d.margem_contribuicao, { destaque: true })}
             ${despesasRows}
             ${linhaDRE("= Resultado Operacional Gerencial", d.resultado_operacional, { destaque: true })}
@@ -230,10 +232,81 @@ async function renderDRE() {
       </div>
       <p class="source-note">mês: ${mes ? esc(mes) : "todo o período"} · unidade: ${unidade ? esc(unidade) : "matriz + filial"} · fonte: CT-e + Contas a Pagar reais + Cost Allocation Engine</p>
     `;
+
+    document.querySelectorAll(".dre-linha-auditavel").forEach((tr) => {
+      tr.addEventListener("click", () => abrirOrigemDrawer(tr.dataset.linha, mes, unidade));
+    });
   } catch (e) {
     el.innerHTML = errorState(e);
   }
 }
+
+// ---------------- drawer "ver origem" ----------------
+const LINHA_LABEL = {
+  receita: "Receita Operacional (CT-e)",
+  frete_terceiro: "Custo direto — Frete terceiro",
+  combustivel: "Combustível (frota própria)",
+  manutencao: "Manutenção (frota própria)",
+};
+
+async function abrirOrigemDrawer(linha, mes, unidade) {
+  const overlay = document.getElementById("origem-drawer-overlay");
+  const titulo = document.getElementById("origem-drawer-titulo");
+  const body = document.getElementById("origem-drawer-body");
+  titulo.textContent = LINHA_LABEL[linha] || linha;
+  body.innerHTML = scanning("Buscando composição");
+  overlay.classList.add("aberto");
+
+  try {
+    const qs = new URLSearchParams({ linha });
+    if (mes) qs.set("mes", mes);
+    if (unidade) qs.set("unidade", unidade);
+    const dados = await api(`/analytics/auditoria/composicao?${qs.toString()}`);
+
+    if (dados.erro) {
+      body.innerHTML = errorState({ message: dados.erro });
+      return;
+    }
+
+    const rows = dados.registros
+      .map(
+        (r) => `
+      <tr>
+        <td>${esc(r.origem)}</td>
+        <td>${esc(r.documento || "—")}</td>
+        <td>${esc(r.cte_numero || "—")}</td>
+        <td>${esc(r.campo)}</td>
+        <td class="num">${brl(r.valor)}</td>
+      </tr>`
+      )
+      .join("");
+
+    body.innerHTML = `
+      <div class="drawer-meta">
+        <div><span class="decisao-label">Valor</span><p class="drawer-meta-valor">${brl(dados.total)}</p></div>
+        <div><span class="decisao-label">Período</span><p>${mes ? esc(mes) : "Todo o período"}</p></div>
+        <div><span class="decisao-label">Unidade</span><p>${unidade ? esc(unidade) : "Matriz + Filial"}</p></div>
+        <div><span class="decisao-label">Registros</span><p>${dados.qtd_registros}</p></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Origem</th><th>Documento</th><th>CT-e</th><th>Campo / Regra</th><th style="text-align:right">Valor</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <p class="source-note">TOTAL AUDITADO: ${brl(dados.total)} — precisa bater exatamente com o valor mostrado na DRE</p>
+    `;
+  } catch (e) {
+    body.innerHTML = errorState(e);
+  }
+}
+
+document.getElementById("origem-drawer-fechar").addEventListener("click", () => {
+  document.getElementById("origem-drawer-overlay").classList.remove("aberto");
+});
+document.getElementById("origem-drawer-overlay").addEventListener("click", (e) => {
+  if (e.target.id === "origem-drawer-overlay") e.target.classList.remove("aberto");
+});
 
 // ---------------- rentabilidade ----------------
 async function populateMonthSelect(select, { includeEmpty } = {}) {
@@ -650,6 +723,88 @@ async function renderTerceiros() {
       </div>
       <p class="source-note">mês: ${mes ? esc(mes) : "todo o período"} · unidade: ${unidade ? esc(unidade) : "matriz + filial"} · exclui frota própria</p>
     `;
+  } catch (e) {
+    el.innerHTML = errorState(e);
+  }
+}
+
+// ---------------- qualidade dos dados / auditoria ----------------
+async function loadQualidade() {
+  const mesSel = document.getElementById("qualidade-mes");
+  const unidadeSel = document.getElementById("qualidade-unidade");
+  if (!mesSel.dataset.loaded) {
+    await populateMonthSelect(mesSel);
+    mesSel.insertAdjacentHTML("afterbegin", `<option value="">Todo o período</option>`);
+    mesSel.value = "";
+    mesSel.dataset.loaded = "1";
+    mesSel.addEventListener("change", renderQualidade);
+    unidadeSel.addEventListener("change", renderQualidade);
+  }
+  renderQualidade();
+}
+
+const STATUS_RECONCILIACAO = {
+  conciliado: { pill: "ok", label: "CONCILIADO" },
+  conciliado_com_rateio: { pill: "warn", label: "CONCILIADO COM RATEIO" },
+  parcial: { pill: "warn", label: "PARCIAL" },
+  divergente: { pill: "danger", label: "DIVERGENTE" },
+  nao_auditavel: { pill: "warn", label: "NÃO AUDITÁVEL" },
+};
+
+const LINHA_POR_INDICADOR = {
+  "Receita Operacional": "receita",
+  "Custo direto — Frete terceiro": "frete_terceiro",
+  "Combustível (frota própria)": "combustivel",
+  "Manutenção (frota própria)": "manutencao",
+};
+
+async function renderQualidade() {
+  const el = document.getElementById("qualidade-content");
+  const mes = document.getElementById("qualidade-mes").value;
+  const unidade = document.getElementById("qualidade-unidade").value;
+  el.innerHTML = scanning("Recalculando por caminho independente");
+  try {
+    const qs = new URLSearchParams();
+    if (mes) qs.set("mes", mes);
+    if (unidade) qs.set("unidade", unidade);
+    const itens = await api(`/analytics/auditoria/reconciliacao?${qs.toString()}`);
+
+    const rows = itens
+      .map((i) => {
+        const st = STATUS_RECONCILIACAO[i.status] || { pill: "ok", label: i.status };
+        const linha = LINHA_POR_INDICADOR[i.indicador];
+        const clique = linha ? ` class="dre-linha-auditavel" data-linha="${linha}"` : "";
+        return `
+      <tr${clique}>
+        <td>${esc(i.indicador)}${linha ? ' <span class="ver-origem">ⓘ ver origem</span>' : ""}</td>
+        <td class="num">${brl(i.valor_dashboard)}</td>
+        <td class="num">${brl(i.valor_recalculado)}</td>
+        <td class="num">${brl(i.diferenca)}</td>
+        <td><span class="pill pill--${st.pill}">${st.label}</span></td>
+      </tr>
+      <tr class="qualidade-nota-row"><td colspan="5">${esc(i.nota)}</td></tr>`;
+      })
+      .join("");
+
+    const todasConciliadas = itens.every((i) => i.status !== "divergente");
+
+    el.innerHTML = `
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label">Status geral</div><div class="kpi-value ${todasConciliadas ? "" : "warn"}">${todasConciliadas ? "SEM DIVERGÊNCIAS" : "DIVERGÊNCIA REAL ENCONTRADA"}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Indicadores auditados</div><div class="kpi-value">${itens.length}</div></div>
+      </div>
+      <div class="table-wrap">
+        <table class="qualidade-table">
+          <thead><tr><th>Indicador</th><th style="text-align:right">Valor Dashboard</th><th style="text-align:right">Valor Recalculado</th><th style="text-align:right">Diferença</th><th>Status</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <p class="source-note">Cada linha é recalculada por um caminho de código independente (soma registro a registro) e comparada com o valor da DRE — tolerância de R$ 0,05 para arredondamento, qualquer coisa acima disso vira DIVERGENTE.</p>
+    `;
+
+    document.querySelectorAll(".dre-linha-auditavel").forEach((tr) => {
+      tr.addEventListener("click", () => abrirOrigemDrawer(tr.dataset.linha, mes, unidade));
+    });
   } catch (e) {
     el.innerHTML = errorState(e);
   }

@@ -14,15 +14,9 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
+from app.services.formatting import brl as _brl
 from app.services.monthly_analytics import detectar_desvios_mensais, listar_meses_disponiveis
 from app.services.rentabilidade_engine import calcular_rentabilidade_por_cliente
-
-
-def _brl(valor: float) -> str:
-    """Formato brasileiro (R$ 1.234,56) — Python's {:,.2f} sozinho é formato americano
-    (1,234.56), inconsistente com o resto da plataforma (toLocaleString('pt-BR') no frontend)."""
-    inteiro, decimal = f"{valor:,.2f}".split(".")
-    return inteiro.replace(",", ".") + "," + decimal
 
 
 @dataclass

@@ -2,6 +2,12 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.services.audit_engine import (
+    composicao_categoria_pagamento,
+    composicao_frete_terceiro,
+    composicao_receita,
+    reconciliar_dre,
+)
 from app.services.decisions_engine import listar_decisoes
 from app.services.dre_engine import calcular_dre
 from app.services.fleet_analytics import custos_operacionais_agregados, rentabilidade_por_veiculo
@@ -170,6 +176,61 @@ def terceiros(mes: str | None = None, unidade: str | None = None, db: Session = 
         }
         for t in itens
     ]
+
+
+@router.get("/auditoria/reconciliacao")
+def auditoria_reconciliacao(mes: str | None = None, unidade: str | None = None, db: Session = Depends(get_db)) -> list[dict]:
+    """Recalcula cada linha da DRE por um caminho de código independente e compara — ver
+    app/services/audit_engine.py. Diferença real (>R$0,05) nunca é escondida."""
+    itens = reconciliar_dre(db, mes_referencia=mes, unidade=unidade)
+    return [
+        {
+            "indicador": i.indicador,
+            "valor_dashboard": i.valor_dashboard,
+            "valor_recalculado": i.valor_recalculado,
+            "diferenca": i.diferenca,
+            "status": i.status,
+            "nota": i.nota,
+        }
+        for i in itens
+    ]
+
+
+_COMPOSICAO_HANDLERS = {
+    "receita": lambda db, mes, unidade: composicao_receita(db, mes, unidade),
+    "frete_terceiro": lambda db, mes, unidade: composicao_frete_terceiro(db, mes, unidade),
+    "combustivel": lambda db, mes, unidade: composicao_categoria_pagamento(db, lambda cc: "OMBUST" in cc, mes, unidade),
+    "manutencao": lambda db, mes, unidade: composicao_categoria_pagamento(db, lambda cc: "ANUTEN" in cc, mes, unidade),
+}
+
+
+@router.get("/auditoria/composicao")
+def auditoria_composicao(
+    linha: str, mes: str | None = None, unidade: str | None = None, db: Session = Depends(get_db)
+) -> dict:
+    """Drill-down 'ver origem' — decompõe uma linha da DRE nos registros reais que a formam."""
+    handler = _COMPOSICAO_HANDLERS.get(linha)
+    if handler is None:
+        return {"erro": f"linha desconhecida: {linha}", "linhas_validas": list(_COMPOSICAO_HANDLERS)}
+
+    itens = handler(db, mes, unidade)
+    return {
+        "linha": linha,
+        "total": sum(i.valor for i in itens),
+        "qtd_registros": len(itens),
+        "registros": [
+            {
+                "origem": i.origem,
+                "documento": i.documento,
+                "cte_numero": i.cte_numero,
+                "campo": i.campo,
+                "valor": i.valor,
+                "regra": i.regra,
+                "arquivo_origem": i.arquivo_origem,
+            }
+            for i in itens
+        ],
+    }
 
 
 @router.get("/frota")

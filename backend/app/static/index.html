@@ -61,6 +61,10 @@
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="7" r="2.6"/><circle cx="14" cy="7" r="2.6"/><path d="M2 17 C2 13.5 4.5 12 6 12 C7.5 12 10 13.5 10 17 M10 17 C10 13.5 12.5 12 14 12 C15.5 12 18 13.5 18 17"/></svg>
         Terceiros
       </div>
+      <div class="nav-item" data-view="qualidade">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 2 L17 5.5 L17 11 C17 15 14 17.5 10 18.5 C6 17.5 3 15 3 11 L3 5.5 Z" stroke-linejoin="round"/><path d="M7 10 L9.2 12.2 L13.5 7.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Qualidade dos Dados
+      </div>
       <div class="nav-item" data-view="importar">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 13 L10 3 M6 7 L10 3 L14 7" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 15 L3 17 L17 17 L17 15"/></svg>
         Importar relatórios
@@ -212,7 +216,36 @@
       <div class="upload-log" id="upload-log">Nenhuma importação executada nesta sessão ainda.</div>
     </section>
 
+    <!-- ===================== QUALIDADE DOS DADOS ===================== -->
+    <section class="view" id="view-qualidade">
+      <div class="page-header"><div class="page-title">Qualidade dos Dados</div></div>
+      <p class="page-sub">Cada linha da DRE recalculada por um caminho de código independente e comparada com o valor mostrado — divergência real nunca é escondida. Clique numa linha para ver a composição registro a registro.</p>
+      <div class="filters-row">
+        <select id="qualidade-mes"></select>
+        <select id="qualidade-unidade">
+          <option value="">Matriz + Filial</option>
+          <option value="matriz">Matriz</option>
+          <option value="filial">Filial</option>
+        </select>
+      </div>
+      <div id="qualidade-content">Carregando…</div>
+    </section>
+
   </main>
+</div>
+
+<!-- ===================== DRAWER "VER ORIGEM" ===================== -->
+<div class="drawer-overlay" id="origem-drawer-overlay">
+  <div class="drawer" id="origem-drawer">
+    <div class="drawer-header">
+      <div>
+        <div class="decisao-label">Origem do valor</div>
+        <div class="drawer-title" id="origem-drawer-titulo">—</div>
+      </div>
+      <button class="secondary" id="origem-drawer-fechar">Fechar ✕</button>
+    </div>
+    <div class="drawer-body" id="origem-drawer-body">Carregando…</div>
+  </div>
 </div>
 
 <script src="/static/app.js"></script>

@@ -626,3 +626,75 @@ section.view.active { display: block; animation: view-in 220ms var(--ease-out); 
   color: var(--ink-tertiary);
 }
 .decisao-footer strong { color: var(--ink); }
+
+/* ============================== Auditável / drill-down ============================== */
+.dre-linha-auditavel { cursor: pointer; transition: background-color 100ms var(--ease-out); }
+.dre-linha-auditavel:hover { background: var(--surface-2); }
+.ver-origem {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.03em;
+  color: var(--gold);
+  opacity: 0;
+  transition: opacity 120ms var(--ease-out);
+}
+.dre-linha-auditavel:hover .ver-origem { opacity: 1; }
+
+.qualidade-table tbody tr:not(.qualidade-nota-row) { cursor: default; }
+.qualidade-nota-row td {
+  padding-top: 0;
+  padding-bottom: 10px;
+  font-size: 0.76rem;
+  color: var(--ink-tertiary);
+  border-bottom: 1px solid var(--border-hair);
+  background: var(--surface-inset);
+}
+.qualidade-nota-row:last-child td { border-bottom: none; }
+
+/* ============================== Drawer "ver origem" ============================== */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 13, 10, 0.6);
+  backdrop-filter: blur(1px);
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms var(--ease-out);
+}
+.drawer-overlay.aberto { opacity: 1; pointer-events: auto; }
+.drawer {
+  position: absolute;
+  top: 0; right: 0;
+  height: 100%;
+  width: min(680px, 92vw);
+  background: var(--ground);
+  border-left: 1px solid var(--border-strong);
+  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(24px);
+  opacity: 0;
+  transition: transform 220ms var(--ease-out), opacity 220ms var(--ease-out);
+}
+.drawer-overlay.aberto .drawer { transform: translateX(0); opacity: 1; }
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+.drawer-title { font-size: 1.1rem; font-weight: 600; color: var(--ink); margin-top: 4px; }
+.drawer-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+.drawer-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-hair);
+}
+.drawer-meta p { margin: 4px 0 0; color: var(--ink-dim); font-size: 0.9rem; }
+.drawer-meta-valor { font-family: var(--font-mono); font-size: 1.3rem !important; font-weight: 600; color: var(--gold) !important; }
