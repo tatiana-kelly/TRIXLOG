@@ -55,12 +55,22 @@ async function loadVisaoGeral() {
       .map((r) => `<tr><td>${esc(r.mes)}</td><td><span class="badge-unidade">${esc(r.unidade || "?")}</span></td><td class="num">${r.quantidade}</td></tr>`)
       .join("");
 
+    const cobertura = status.cobertura_custo;
+    const coberturaClasse = cobertura.pct_cobertura >= 50 ? "" : "warn";
+
     el.innerHTML = `
       <div class="kpi-row">
         <div class="kpi-card"><div class="kpi-label">CT-e importados</div><div class="kpi-value">${status.cte.total}</div></div>
         <div class="kpi-card"><div class="kpi-label">Contas a receber</div><div class="kpi-value">${status.contas_receber.total}</div></div>
         <div class="kpi-card"><div class="kpi-label">Contas a pagar</div><div class="kpi-value">${status.contas_pagar.total}</div></div>
         <div class="kpi-card"><div class="kpi-label">Meses cobertos</div><div class="kpi-value gold">${meses.length}</div></div>
+      </div>
+      <div class="kpi-row">
+        <div class="kpi-card" style="grid-column: span 2">
+          <div class="kpi-label">Cobertura de custo — CT-e's com vínculo confirmado</div>
+          <div class="kpi-value ${coberturaClasse}">${pct(cobertura.pct_cobertura)}</div>
+          <div class="source-note" style="margin:6px 0 0">${cobertura.ctes_com_custo_vinculado} de ${cobertura.ctes_total} CT-e's — o resto aguarda alocação (Camada 0/2) ou conciliação manual, nunca é tratado como custo zero</div>
+        </div>
       </div>
       <div class="table-wrap">
         <table>

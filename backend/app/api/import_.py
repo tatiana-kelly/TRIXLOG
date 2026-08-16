@@ -117,11 +117,21 @@ def import_status(db: Session = Depends(get_db)) -> dict:
             contagem[chave] = contagem.get(chave, 0) + 1
         return [{"mes": mes, "unidade": unidade, "quantidade": qtd} for (mes, unidade), qtd in contagem.items()]
 
+    total_ctes = db.query(CTe).count()
+    custo_vinculado = db.query(ViagemLink).filter(ViagemLink.status == "resolvido").count()
+    pct_cobertura = round(custo_vinculado / total_ctes * 100, 1) if total_ctes else 0.0
+
     return {
-        "cte": {"total": db.query(CTe).count(), "por_mes_unidade": _resumo_meses(CTe, CTe.data_emissao)},
+        "cte": {"total": total_ctes, "por_mes_unidade": _resumo_meses(CTe, CTe.data_emissao)},
         "carta_frete": {"total": db.query(CartaFrete).count()},
         "contas_receber": {"total": db.query(FaturaReceber).count()},
         "contas_pagar": {"total": db.query(PagamentoFornecedor).count()},
+        # Índice de cobertura de custo — nunca deixar o usuário assumir precisão que não existe.
+        "cobertura_custo": {
+            "ctes_com_custo_vinculado": custo_vinculado,
+            "ctes_total": total_ctes,
+            "pct_cobertura": pct_cobertura,
+        },
     }
 
 
