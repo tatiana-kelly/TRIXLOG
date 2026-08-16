@@ -39,6 +39,7 @@ function loadView(view) {
   if (view === "conciliacao") loadConciliacao();
   if (view === "rotas") loadRotas();
   if (view === "frota") loadFrota();
+  if (view === "terceiros") loadTerceiros();
 }
 
 // ---------------- visão geral ----------------
@@ -589,6 +590,69 @@ async function loadFrota() {
 
 function custoIndeterminavelCell() {
   return `<span class="margem-cell"><span class="radar-light radar-light--unknown"></span><span class="margem-indeterminavel">não determinável</span></span>`;
+}
+
+// ---------------- terceiros ----------------
+async function loadTerceiros() {
+  const mesSel = document.getElementById("terceiros-mes");
+  const unidadeSel = document.getElementById("terceiros-unidade");
+  if (!mesSel.dataset.loaded) {
+    await populateMonthSelect(mesSel);
+    mesSel.insertAdjacentHTML("afterbegin", `<option value="">Todo o período</option>`);
+    mesSel.value = "";
+    mesSel.dataset.loaded = "1";
+    mesSel.addEventListener("change", renderTerceiros);
+    unidadeSel.addEventListener("change", renderTerceiros);
+  }
+  renderTerceiros();
+}
+
+async function renderTerceiros() {
+  const el = document.getElementById("terceiros-content");
+  const mes = document.getElementById("terceiros-mes").value;
+  const unidade = document.getElementById("terceiros-unidade").value;
+  el.innerHTML = scanning("Sincronizando dado");
+  try {
+    const qs = new URLSearchParams();
+    if (mes) qs.set("mes", mes);
+    if (unidade) qs.set("unidade", unidade);
+    const terceiros = await api(`/analytics/terceiros?${qs.toString()}`);
+    if (!terceiros.length) {
+      el.innerHTML = emptyState("Nenhum transportador terceiro encontrado neste período/unidade.");
+      return;
+    }
+
+    const receitaTotal = terceiros.reduce((s, t) => s + t.receita_total, 0);
+
+    const rows = terceiros
+      .map(
+        (t) => `
+      <tr>
+        <td>${esc(t.proprietario)}</td>
+        <td class="num">${t.qtd_ctes}</td>
+        <td class="num">${brl(t.receita_total)}</td>
+        <td class="num">${t.viagens_com_custo_alocado ? brl(t.custo_alocado_total) : "—"}</td>
+        <td class="num">${margemCell({ viagens_com_custo_alocado: t.viagens_com_custo_alocado, margem_total: t.margem_total })}</td>
+      </tr>`
+      )
+      .join("");
+
+    el.innerHTML = `
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label">Transportadores terceiros</div><div class="kpi-value">${terceiros.length}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Receita operada por terceiros</div><div class="kpi-value gold">${brl(receitaTotal)}</div></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Transportador / Proprietário</th><th style="text-align:right">CT-e's</th><th style="text-align:right">Receita</th><th style="text-align:right">Custo (frete terceiro)</th><th style="text-align:right">Margem</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <p class="source-note">mês: ${mes ? esc(mes) : "todo o período"} · unidade: ${unidade ? esc(unidade) : "matriz + filial"} · exclui frota própria</p>
+    `;
+  } catch (e) {
+    el.innerHTML = errorState(e);
+  }
 }
 
 // ---------------- importar ----------------

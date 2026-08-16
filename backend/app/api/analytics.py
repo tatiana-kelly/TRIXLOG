@@ -12,6 +12,7 @@ from app.services.monthly_analytics import (
     rentabilidade_mensal_por_cliente,
 )
 from app.services.rotas_analytics import calcular_rentabilidade_por_rota
+from app.services.terceiros_analytics import calcular_rentabilidade_por_terceiro
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -149,6 +150,25 @@ def rotas(mes: str | None = None, unidade: str | None = None, db: Session = Depe
             "viagens_pendentes": r.viagens_pendentes,
         }
         for r in itens
+    ]
+
+
+@router.get("/terceiros")
+def terceiros(mes: str | None = None, unidade: str | None = None, db: Session = Depends(get_db)) -> list[dict]:
+    """Rentabilidade por transportador/proprietário terceiro (exclui frota própria) — ver
+    app/services/terceiros_analytics.py."""
+    itens = calcular_rentabilidade_por_terceiro(db, mes_referencia=mes, unidade=unidade)
+    return [
+        {
+            "proprietario": t.proprietario,
+            "qtd_ctes": t.qtd_ctes,
+            "receita_total": t.receita_total,
+            "custo_alocado_total": t.custo_alocado_total,
+            "margem_total": t.margem_total,
+            "viagens_com_custo_alocado": t.viagens_com_custo_alocado,
+            "viagens_pendentes": t.viagens_pendentes,
+        }
+        for t in itens
     ]
 
 
