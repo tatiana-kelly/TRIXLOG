@@ -174,10 +174,21 @@ async function loadDRE() {
   renderDRE();
 }
 
+const CATEGORIAS_CUSTO_FIXO_MANUAL = new Set([
+  "Aluguel de frota",
+  "Pessoal de frota (salário + comissão + diária)",
+  "Salários administrativos",
+  "Seguro de carga",
+  "Outros custos",
+]);
+
 function linhaDRE(label, valor, { destaque, indent, linha } = {}) {
   const clicavel = linha ? ` class="dre-linha-auditavel" data-linha="${linha}"` : "";
+  const marcaManual = CATEGORIAS_CUSTO_FIXO_MANUAL.has(label)
+    ? helpIcon("Custo fixo mensal informado diretamente pela Tatiana — não consta em nenhum relatório importado (CT-e, Contas a Receber, Contas a Pagar, Carta Frete). Valor consolidado da empresa, sem chave de unidade.")
+    : "";
   return `<tr class="${destaque ? "dre-subtotal" : ""}"${clicavel}>
-    <td style="${indent ? "padding-left:28px;color:var(--ink-dim)" : ""}">${esc(label)}${linha ? ' <span class="ver-origem">ⓘ ver origem</span>' : ""}</td>
+    <td style="${indent ? "padding-left:28px;color:var(--ink-dim)" : ""}">${esc(label)}${linha ? ' <span class="ver-origem">ⓘ ver origem</span>' : ""}${marcaManual}</td>
     <td class="num">${brl(valor)}</td>
   </tr>`;
 }
@@ -212,6 +223,10 @@ async function renderDRE() {
         ? `<p class="dre-pendente-note"><span class="radar-light radar-light--unknown"></span><strong>Risco não conciliado:</strong> ${brl(d.combustivel_risco_sobreposicao_terceiro)} de vale-combustível de terceiro (já embutido no Frete do Motorista) pode se sobrepor à linha "Combustível" abaixo — sem chave que ligue Carta Frete a Contas a Pagar de combustível, não é possível confirmar nem descartar. Nunca deduzido automaticamente.</p>`
         : "";
 
+    const custosFixosExcluidosAlerta = d.custos_fixos_excluidos_por_filtro_unidade
+      ? `<p class="dre-pendente-note"><span class="radar-light radar-light--unknown"></span>Custos fixos mensais informados (aluguel de frota, pessoal de frota, salários administrativos, seguro de carga, outros) <strong>não aparecem nesta visão</strong> — são valores consolidados da empresa, sem chave de matriz/filial. Veja a visão "Matriz + Filial" para incluí-los.</p>`
+      : "";
+
     el.innerHTML = `
       <div class="kpi-row">
         <div class="kpi-card"><div class="kpi-label">Receita operacional</div><div class="kpi-value">${brl(d.receita_operacional)}</div></div>
@@ -221,6 +236,7 @@ async function renderDRE() {
       </div>
       ${pendenteAlerta}
       ${riscoCombustivelAlerta}
+      ${custosFixosExcluidosAlerta}
       <div class="table-wrap">
         <table class="dre-table">
           <tbody>

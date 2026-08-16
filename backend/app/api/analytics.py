@@ -113,6 +113,7 @@ def dre(mes: str | None = None, unidade: str | None = None, db: Session = Depend
         "despesas_financeiras": d.despesas_financeiras,
         "resultado_gerencial": d.resultado_gerencial,
         "pct_receita_com_custo_terceiro_confirmado": d.pct_receita_com_custo_terceiro_confirmado,
+        "custos_fixos_excluidos_por_filtro_unidade": d.custos_fixos_excluidos_por_filtro_unidade,
     }
 
 

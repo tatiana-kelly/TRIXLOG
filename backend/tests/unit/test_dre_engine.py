@@ -3,6 +3,7 @@ from datetime import date
 from app.models.carta_frete import CartaFrete
 from app.models.contrato_transporte import ContratoTransporte
 from app.models.cte import CTe
+from app.models.custo_fixo_mensal import CustoFixoMensal
 from app.models.pagamento_fornecedor import PagamentoFornecedor
 from app.models.viagem_link import ViagemLink
 from app.services.dre_engine import calcular_dre
@@ -109,6 +110,52 @@ def test_despesas_operacionais_e_financeiras_reais(db_session):
     assert dre.margem_contribuicao == 10000.0
     assert dre.resultado_operacional == 10000.0 - 700.0
     assert dre.resultado_gerencial == 10000.0 - 700.0 - 100.0
+
+
+def test_custo_fixo_mensal_entra_na_despesa_operacional_so_na_visao_consolidada(db_session):
+    """Custo fixo informado diretamente pela Tatiana (aluguel de frota, pessoal de frota etc.) não
+    tem chave de unidade -- só entra quando a DRE é vista consolidada (sem filtro matriz/filial).
+    Filtrando por unidade, o dado faltante fica declarado via custos_fixos_excluidos_por_filtro_unidade,
+    nunca dividido/rateado silenciosamente entre matriz e filial."""
+    db_session.add(CTe(cte_numero="1", cte_serie="1", pagador_frete_nome="A", total=100000.0, unidade="matriz", data_emissao=date(2026, 7, 1)))
+    db_session.add_all(
+        [
+            CustoFixoMensal(categoria="aluguel_frota", rotulo="Aluguel de frota", mes_referencia="2026-07", valor=80675.0, fonte="teste"),
+            CustoFixoMensal(categoria="pessoal_frota", rotulo="Pessoal de frota (salário + comissão + diária)", mes_referencia="2026-07", valor=41698.0, fonte="teste"),
+            CustoFixoMensal(categoria="salarios_administrativos", rotulo="Salários administrativos", mes_referencia="2026-07", valor=28000.0, fonte="teste"),
+            CustoFixoMensal(categoria="seguro_carga", rotulo="Seguro de carga", mes_referencia="2026-07", valor=3000.0, fonte="teste"),
+            CustoFixoMensal(categoria="outros_custos", rotulo="Outros custos", mes_referencia="2026-07", valor=5000.0, fonte="teste"),
+            CustoFixoMensal(categoria="aluguel_frota", rotulo="Aluguel de frota", mes_referencia="2026-06", valor=80675.0, fonte="teste"),  # mês diferente, não deve entrar
+        ]
+    )
+    db_session.commit()
+
+    dre_consolidada = calcular_dre(db_session, mes_referencia="2026-07")
+    assert dre_consolidada.despesas_operacionais["Aluguel de frota"] == 80675.0
+    assert dre_consolidada.despesas_operacionais["Pessoal de frota (salário + comissão + diária)"] == 41698.0
+    assert dre_consolidada.despesas_operacionais["Salários administrativos"] == 28000.0
+    assert dre_consolidada.despesas_operacionais["Seguro de carga"] == 3000.0
+    assert dre_consolidada.despesas_operacionais["Outros custos"] == 5000.0
+    assert dre_consolidada.custos_fixos_excluidos_por_filtro_unidade is False
+
+    dre_por_unidade = calcular_dre(db_session, mes_referencia="2026-07", unidade="matriz")
+    assert "Aluguel de frota" not in dre_por_unidade.despesas_operacionais
+    assert dre_por_unidade.custos_fixos_excluidos_por_filtro_unidade is True
+
+
+def test_salarios_administrativos_manual_nao_soma_com_administrativas_mao_de_obra_real(db_session):
+    """Confirmado com a Tatiana em 2026-08-16: o valor manual de salários administrativos
+    SUBSTITUI a categoria real "ADMINISTRATIVAS - MÃO DE OBRA" de Contas a Pagar (que estava
+    incompleta) -- nunca soma os dois, senão duplica o mesmo custo."""
+    db_session.add(CTe(cte_numero="1", cte_serie="1", pagador_frete_nome="A", total=10000.0, unidade="matriz", data_emissao=date(2026, 5, 1)))
+    db_session.add(PagamentoFornecedor(centro_custo="ADMINISTRATIVAS - MÃO DE OBRA", valor=21817.0, unidade="matriz", dt_emissao=date(2026, 5, 1)))
+    db_session.add(CustoFixoMensal(categoria="salarios_administrativos", rotulo="Salários administrativos", mes_referencia="2026-05", valor=28000.0, fonte="teste"))
+    db_session.commit()
+
+    dre = calcular_dre(db_session, mes_referencia="2026-05")
+
+    assert dre.despesas_operacionais == {"Salários administrativos": 28000.0}
+    assert dre.total_despesas_operacionais == 28000.0
 
 
 def test_filtra_por_mes_e_unidade(db_session):

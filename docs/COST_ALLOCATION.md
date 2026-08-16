@@ -438,3 +438,32 @@ automaticamente (seria inventar uma dedução sem prova) — só declara o risco
 tela de Qualidade dos Dados e no alerta da DRE. Fica registrado como dado pendente para fechar:
 um relatório de conciliação de vale-combustível (nota do posto ↔ motorista/placa/carta-frete)
 resolveria isso com certeza.
+
+10c. **Custos fixos mensais informados diretamente pela Tatiana (2026-08-16) — não constam em
+nenhum relatório importado.** Confirmado checando `PagamentoFornecedor.centro_custo` (todos os
+341 lançamentos reais): não existe nenhuma categoria de aluguel/locação de veículo, seguro de
+carga, ou "outros custos" — são custos genuinamente ausentes do dado importado, não um erro de
+classificação. Cinco categorias, mesmo valor todo mês (mai/jun/jul 2026), sem chave de unidade
+(a Tatiana informou o total consolidado da empresa):
+
+| Categoria | Valor/mês |
+|---|---:|
+| Aluguel de frota | R$ 80.675,00 |
+| Pessoal de frota (salário + comissão + diária) | R$ 41.698,00 |
+| Salários administrativos | R$ 28.000,00 |
+| Seguro de carga | R$ 3.000,00 (média) |
+| Outros custos | R$ 5.000,00 (média) |
+
+Modelado em `app/models/custo_fixo_mensal.py` (`CustoFixoMensal`), lançado via
+`scripts/seed_custos_fixos_mensais.py` (idempotente — reexecutável se um valor mudar), e somado
+em `despesas_operacionais` só na visão consolidada (sem filtro de unidade) — numa visão só-matriz
+ou só-filial não há como ratear sem inventar uma proporção, então a DRE declara explicitamente
+que os custos fixos "não aparecem nesta visão" em vez de dividir ao meio ou por CT-e's.
+
+**"Salários administrativos" SUBSTITUI, não soma sobre, a categoria real `ADMINISTRATIVAS - MÃO
+DE OBRA` de Contas a Pagar** — confirmado explicitamente com a Tatiana (AskUserQuestion,
+2026-08-16): essa categoria de Contas a Pagar estava incompleta (R$ 21.817,00 em maio, R$
+14.736,59 em junho, **zero lançamentos em julho**) e R$ 28.000,00/mês é o valor real e completo
+da folha administrativa. `_CATEGORIAS_DESPESA_OPERACIONAL` em `dre_engine.py` não mapeia mais
+essa categoria de Contas a Pagar — se voltasse a mapear ao lado do valor manual, duplicaria o
+mesmo custo, violando a regra "um evento econômico = um único custo".

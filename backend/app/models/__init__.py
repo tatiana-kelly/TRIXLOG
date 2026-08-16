@@ -2,6 +2,7 @@ from app.models.audit_run import AuditRun
 from app.models.carta_frete import CartaFrete
 from app.models.contrato_transporte import ContratoTransporte
 from app.models.cte import CTe
+from app.models.custo_fixo_mensal import CustoFixoMensal
 from app.models.fatura_receber import FaturaReceber
 from app.models.pagamento_fornecedor import PagamentoFornecedor
 from app.models.viagem_link import ViagemLink
@@ -11,6 +12,7 @@ __all__ = [
     "CTe",
     "CartaFrete",
     "ContratoTransporte",
+    "CustoFixoMensal",
     "FaturaReceber",
     "PagamentoFornecedor",
     "ViagemLink",

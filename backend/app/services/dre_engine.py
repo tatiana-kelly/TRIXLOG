@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.models.carta_frete import CartaFrete
 from app.models.cte import CTe
+from app.models.custo_fixo_mensal import CustoFixoMensal
 from app.models.pagamento_fornecedor import PagamentoFornecedor
 from app.services.custo_lookup import custo_confirmado_por_cte
 
@@ -45,11 +46,15 @@ class DRE:
     despesas_financeiras: float = 0.0
     resultado_gerencial: float = 0.0
     pct_receita_com_custo_terceiro_confirmado: float = 0.0
+    custos_fixos_excluidos_por_filtro_unidade: bool = False
 
 
+# "ADMINISTRATIVAS - MÃO DE OBRA" NÃO entra mais aqui — confirmado com a Tatiana em 2026-08-16
+# que a categoria real de Contas a Pagar estava incompleta (zero lançamentos em julho/2026) e
+# foi substituída pelo valor real e completo da folha administrativa, informado diretamente
+# (CustoFixoMensal, categoria "salarios_administrativos") — ver calcular_dre() abaixo.
 _CATEGORIAS_DESPESA_OPERACIONAL = {
     "ADMINISTRATIVAS - GERAL": "Administrativas",
-    "ADMINISTRATIVAS - MÃO DE OBRA": "Mão de obra",
     "LICENÇA DE USO SOFTWARE": "Software",
     "MEDICINA DO TRABALHO": "Medicina do trabalho",
     "SEGUROS": "Seguros",
@@ -115,6 +120,20 @@ def calcular_dre(db: Session, mes_referencia: str | None = None, unidade: str | 
         valor = sum(float(p.valor) for p in pagamentos if p.centro_custo == centro_custo_real)
         if valor:
             dre.despesas_operacionais[rotulo] = valor
+
+    # Custos fixos mensais informados diretamente pela Tatiana (aluguel de frota, pessoal de
+    # frota, salários administrativos, seguro de carga, outros) — nunca aparecem em nenhum
+    # relatório importado, e não têm chave de unidade (valor consolidado da empresa). Só entram
+    # na visão consolidada (sem filtro de unidade) — numa visão por matriz/filial isolada não há
+    # como ratear sem inventar uma proporção, então ficam de fora e o dado faltante é declarado.
+    dre.custos_fixos_excluidos_por_filtro_unidade = bool(unidade)
+    if not unidade:
+        custos_fixos_query = db.query(CustoFixoMensal)
+        if mes_referencia:
+            custos_fixos_query = custos_fixos_query.filter(CustoFixoMensal.mes_referencia == mes_referencia)
+        for cf in custos_fixos_query.all():
+            dre.despesas_operacionais[cf.rotulo] = dre.despesas_operacionais.get(cf.rotulo, 0.0) + float(cf.valor)
+
     dre.total_despesas_operacionais = sum(dre.despesas_operacionais.values())
 
     dre.resultado_operacional = dre.margem_contribuicao - dre.total_despesas_operacionais
