@@ -363,6 +363,10 @@ async function renderRentabilidade() {
       )
       .join("");
 
+    const custoAlocadoTotal = dados.reduce((s, d) => s + d.custo_alocado_total, 0);
+    const receitaPendenteTotal = dados.reduce((s, d) => s + d.receita_total * (d.pct_custo_nao_alocado / 100), 0);
+    const pctPendenteTotal = receitaTotal ? (receitaPendenteTotal / receitaTotal) * 100 : 0;
+
     el.innerHTML = `
       <div class="kpi-row">
         <div class="kpi-card"><div class="kpi-label">Receita do mês</div><div class="kpi-value">${brl(receitaTotal)}</div></div>
@@ -372,8 +376,9 @@ async function renderRentabilidade() {
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Cliente</th><th style="text-align:right">Receita</th><th style="text-align:right">Custo alocado</th><th style="text-align:right">Margem</th><th style="text-align:right">% pendente</th></tr></thead>
+          <thead><tr><th>Cliente</th><th style="text-align:right">Receita</th><th style="text-align:right">Custo alocado</th><th style="text-align:right">Margem${helpIcon("Margem = Receita (CT-e) − Custo alocado. Custo alocado vem, nesta ordem de prioridade: 1º Carta Frete (custo direto real da viagem, Camada 0); 2º Contrato de Transporte (heurística nome + data, Camada 2). Sem nenhuma das duas fontes, a viagem fica “não determinável” — nunca é tratada como custo zero, e a margem nunca aparece como líquida sem essa confirmação.")}</th><th style="text-align:right">% pendente</th></tr></thead>
           <tbody>${rows}</tbody>
+          <tfoot><tr class="total-row"><td>Total</td><td class="num">${brl(receitaTotal)}</td><td class="num">${brl(custoAlocadoTotal)}</td><td class="num">${brl(margemConhecida)}</td><td class="num">${pct(pctPendenteTotal)}</td></tr></tfoot>
         </table>
       </div>
       <p class="source-note">mês: ${esc(mes)} · unidade: ${unidade ? esc(unidade) : "matriz + filial"} · fonte: CT-e real + Cost Allocation Engine</p>
@@ -583,11 +588,18 @@ async function renderRotas() {
       )
       .join("");
 
+    const qtdCtesTotal = rotas.reduce((s, r) => s + r.qtd_ctes, 0);
+    const receitaTotal = rotas.reduce((s, r) => s + r.receita_total, 0);
+    const custoTotal = rotas.reduce((s, r) => s + r.custo_alocado_total, 0);
+    const margemTotal = rotas.reduce((s, r) => s + r.margem_total, 0);
+    const viagensComCustoTotal = rotas.reduce((s, r) => s + r.viagens_com_custo_alocado, 0);
+
     el.innerHTML = `
       <div class="table-wrap">
         <table>
           <thead><tr><th>Rota</th><th style="text-align:right">CT-e's</th><th style="text-align:right">Receita</th><th style="text-align:right">Custo alocado</th><th style="text-align:right">Margem</th></tr></thead>
           <tbody>${rows}</tbody>
+          <tfoot><tr class="total-row"><td>Total</td><td class="num">${qtdCtesTotal}</td><td class="num">${brl(receitaTotal)}</td><td class="num">${brl(custoTotal)}</td><td class="num">${margemCell({ viagens_com_custo_alocado: viagensComCustoTotal, margem_total: margemTotal })}</td></tr></tfoot>
         </table>
       </div>
       <p class="source-note">rota = local de coleta → local de entrega do CT-e · mês: ${mes ? esc(mes) : "todo o período"} · unidade: ${unidade ? esc(unidade) : "matriz + filial"}</p>
@@ -599,12 +611,31 @@ async function renderRotas() {
 
 // ---------------- frota própria ----------------
 async function loadFrota() {
+  const mesSel = document.getElementById("frota-mes");
+  const unidadeSel = document.getElementById("frota-unidade");
+  if (!mesSel.dataset.loaded) {
+    await populateMonthSelect(mesSel);
+    mesSel.insertAdjacentHTML("afterbegin", `<option value="">Todo o período</option>`);
+    mesSel.value = "";
+    mesSel.dataset.loaded = "1";
+    mesSel.addEventListener("change", renderFrota);
+    unidadeSel.addEventListener("change", renderFrota);
+  }
+  renderFrota();
+}
+
+async function renderFrota() {
   const el = document.getElementById("frota-content");
+  const mes = document.getElementById("frota-mes").value;
+  const unidade = document.getElementById("frota-unidade").value;
   el.innerHTML = scanning("Sincronizando dado");
   try {
-    const dados = await api("/analytics/frota");
+    const qs = new URLSearchParams();
+    if (mes) qs.set("mes", mes);
+    if (unidade) qs.set("unidade", unidade);
+    const dados = await api(`/analytics/frota?${qs.toString()}`);
     if (!dados.veiculos.length) {
-      el.innerHTML = emptyState("Nenhum veículo de frota própria encontrado no dado importado.");
+      el.innerHTML = emptyState("Nenhum veículo de frota própria encontrado neste período/unidade.");
       return;
     }
 
@@ -637,6 +668,7 @@ async function loadFrota() {
       </tr>`
       )
       .join("");
+    const agregadosTotal = dados.custos_operacionais_agregados.reduce((s, c) => s + c.valor_total, 0);
 
     el.innerHTML = `
       <div class="kpi-row">
@@ -649,9 +681,10 @@ async function loadFrota() {
         <table>
           <thead><tr><th>Placa</th><th>Unidade</th><th style="text-align:right">Viagens</th><th style="text-align:right">Receita</th><th style="text-align:right">Combustível</th><th style="text-align:right">Manutenção</th><th style="text-align:right">Pedágio</th></tr></thead>
           <tbody>${rows}</tbody>
+          <tfoot><tr class="total-row"><td>Total</td><td></td><td class="num">${viagensTotal}</td><td class="num">${brl(receitaTotal)}</td><td class="num">${custoIndeterminavelCell()}</td><td class="num">${custoIndeterminavelCell()}</td><td class="num">${custoIndeterminavelCell()}</td></tr></tfoot>
         </table>
       </div>
-      <p class="source-note">receita: CTe.veiculo_placa (real) · custo direto por veículo: aguardando relatório com chave de placa — ver nota acima</p>
+      <p class="source-note">mês: ${mes ? esc(mes) : "todo o período"} · unidade: ${unidade ? esc(unidade) : "matriz + filial"} · receita: CTe.veiculo_placa (real) · custo direto por veículo: aguardando relatório com chave de placa — ver nota acima</p>
 
       <div class="page-header" style="margin-top:32px"><div class="page-title" style="font-size:1rem">Custo operacional real — só agregado, nunca por placa</div></div>
       <p class="page-sub">O que existe hoje em Contas a Pagar, sem chave de veículo. Mostrado por transparência, não usado no cálculo por placa acima.</p>
@@ -659,6 +692,7 @@ async function loadFrota() {
         <table>
           <thead><tr><th>Categoria</th><th>Unidade</th><th style="text-align:right">Lançamentos</th><th style="text-align:right">Valor</th></tr></thead>
           <tbody>${agregados}</tbody>
+          <tfoot><tr class="total-row"><td>Total</td><td></td><td class="num">${dados.custos_operacionais_agregados.reduce((s, c) => s + c.linhas, 0)}</td><td class="num">${brl(agregadosTotal)}</td></tr></tfoot>
         </table>
       </div>
     `;
@@ -702,6 +736,10 @@ async function renderTerceiros() {
     }
 
     const receitaTotal = terceiros.reduce((s, t) => s + t.receita_total, 0);
+    const custoTotal = terceiros.reduce((s, t) => s + t.custo_alocado_total, 0);
+    const margemTotal = terceiros.reduce((s, t) => s + t.margem_total, 0);
+    const qtdCtesTotal = terceiros.reduce((s, t) => s + t.qtd_ctes, 0);
+    const viagensComCustoTotal = terceiros.reduce((s, t) => s + t.viagens_com_custo_alocado, 0);
 
     const rows = terceiros
       .map(
@@ -712,6 +750,7 @@ async function renderTerceiros() {
         <td class="num">${brl(t.receita_total)}</td>
         <td class="num">${t.viagens_com_custo_alocado ? brl(t.custo_alocado_total) : "—"}</td>
         <td class="num">${margemCell({ viagens_com_custo_alocado: t.viagens_com_custo_alocado, margem_total: t.margem_total })}</td>
+        <td class="num">${pctMargemCell(t)}</td>
       </tr>`
       )
       .join("");
@@ -723,8 +762,9 @@ async function renderTerceiros() {
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Transportador / Proprietário</th><th style="text-align:right">CT-e's</th><th style="text-align:right">Receita</th><th style="text-align:right">Custo (frete terceiro)</th><th style="text-align:right">Margem</th></tr></thead>
+          <thead><tr><th>Transportador / Proprietário</th><th style="text-align:right">CT-e's</th><th style="text-align:right">Receita</th><th style="text-align:right">Custo (frete terceiro)</th><th style="text-align:right">Margem</th><th style="text-align:right">Margem %</th></tr></thead>
           <tbody>${rows}</tbody>
+          <tfoot><tr class="total-row"><td>Total</td><td class="num">${qtdCtesTotal}</td><td class="num">${brl(receitaTotal)}</td><td class="num">${brl(custoTotal)}</td><td class="num">${brl(margemTotal)}</td><td class="num">${pctMargemCell({ viagens_com_custo_alocado: viagensComCustoTotal, margem_total: margemTotal, receita_total: receitaTotal })}</td></tr></tfoot>
         </table>
       </div>
       <p class="source-note">mês: ${mes ? esc(mes) : "todo o período"} · unidade: ${unidade ? esc(unidade) : "matriz + filial"} · exclui frota própria</p>
@@ -898,6 +938,17 @@ function margemCell(d) {
     return `<span class="margem-cell"><span class="radar-light radar-light--ok"></span>${brl(d.margem_total)}</span>`;
   }
   return `<span class="margem-cell"><span class="radar-light radar-light--pending"></span><span class="margem-indeterminavel">não determinável</span></span>`;
+}
+
+function pctMargemCell(d) {
+  if (!d.viagens_com_custo_alocado || !d.receita_total) {
+    return `<span class="margem-indeterminavel">—</span>`;
+  }
+  return pct((d.margem_total / d.receita_total) * 100);
+}
+
+function helpIcon(texto) {
+  return `<span class="help-icon" tabindex="0">?<span class="help-tooltip">${esc(texto)}</span></span>`;
 }
 
 function scanning(label) {

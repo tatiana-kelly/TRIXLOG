@@ -343,6 +343,65 @@ tbody tr { transition: background-color 100ms var(--ease-out); }
 tbody tr:hover td { background: var(--surface-2); }
 tbody tr:last-child td { border-bottom: none; }
 
+/* linha de total — soma real das linhas acima, nunca um número à parte não rastreável */
+tfoot .total-row td {
+  background: var(--surface-2);
+  border-top: 1px solid var(--border-strong);
+  border-bottom: none;
+  color: var(--ink);
+  font-weight: 600;
+}
+tfoot .total-row:hover td { background: var(--surface-2); }
+
+/* ícone "?" com tooltip — explica a fórmula de um número, não substitui o drill-down "ver origem" */
+.help-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  margin-left: 6px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  color: var(--ink-tertiary);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  cursor: help;
+  position: relative;
+  vertical-align: middle;
+}
+.help-icon:hover, .help-icon:focus { color: var(--gold); border-color: var(--gold); outline: none; }
+.help-tooltip {
+  position: absolute;
+  top: 130%;
+  right: 0;
+  width: 280px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: normal;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 120ms var(--ease-out), transform 120ms var(--ease-out);
+  z-index: 20;
+}
+.help-icon:hover .help-tooltip, .help-icon:focus .help-tooltip {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
 /* margem "não determinável" — estado próprio, nunca um número mudo */
 .margem-cell {
   display: inline-flex;

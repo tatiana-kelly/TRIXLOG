@@ -49,8 +49,17 @@ class CustoOperacionalAgregado:
     linhas: int
 
 
-def rentabilidade_por_veiculo(db: Session) -> list[VeiculoRentabilidade]:
-    ctes = db.query(CTe).filter(CTe.proprietario_veiculo_nome.in_(DONOS_FROTA_PROPRIA)).all()
+def rentabilidade_por_veiculo(
+    db: Session, mes_referencia: str | None = None, unidade: str | None = None
+) -> list[VeiculoRentabilidade]:
+    """mes_referencia: filtra por "YYYY-MM" (baseado em CTe.data_emissao, competência — nunca data
+    de pagamento). unidade: filtra por "matriz"|"filial"."""
+    query = db.query(CTe).filter(CTe.proprietario_veiculo_nome.in_(DONOS_FROTA_PROPRIA))
+    if unidade:
+        query = query.filter(CTe.unidade == unidade)
+    ctes = query.all()
+    if mes_referencia:
+        ctes = [c for c in ctes if c.data_emissao and c.data_emissao.strftime("%Y-%m") == mes_referencia]
 
     por_placa: dict[str, VeiculoRentabilidade] = {}
     for cte in ctes:
@@ -68,9 +77,18 @@ def rentabilidade_por_veiculo(db: Session) -> list[VeiculoRentabilidade]:
     return sorted(por_placa.values(), key=lambda v: v.receita_total, reverse=True)
 
 
-def custos_operacionais_agregados(db: Session) -> list[CustoOperacionalAgregado]:
-    """Combustível e manutenção reais, agregados por unidade — não por placa (ver módulo)."""
-    pagamentos = db.query(PagamentoFornecedor).all()
+def custos_operacionais_agregados(
+    db: Session, mes_referencia: str | None = None, unidade: str | None = None
+) -> list[CustoOperacionalAgregado]:
+    """Combustível e manutenção reais, agregados por unidade — não por placa (ver módulo).
+    mes_referencia: filtra por "YYYY-MM" (baseado em PagamentoFornecedor.dt_emissao, competência —
+    mesma base usada pela DRE, nunca data de pagamento)."""
+    query = db.query(PagamentoFornecedor)
+    if unidade:
+        query = query.filter(PagamentoFornecedor.unidade == unidade)
+    pagamentos = query.all()
+    if mes_referencia:
+        pagamentos = [p for p in pagamentos if p.dt_emissao and p.dt_emissao.strftime("%Y-%m") == mes_referencia]
 
     categorias = {
         "combustivel": lambda cc: cc and "OMBUST" in cc,
@@ -83,11 +101,11 @@ def custos_operacionais_agregados(db: Session) -> list[CustoOperacionalAgregado]
         for p in pagamentos:
             if matcher(p.centro_custo):
                 por_unidade.setdefault(p.unidade, []).append(p)
-        for unidade, linhas in por_unidade.items():
+        for unidade_agrupada, linhas in por_unidade.items():
             resultado.append(
                 CustoOperacionalAgregado(
                     categoria=categoria,
-                    unidade=unidade,
+                    unidade=unidade_agrupada,
                     valor_total=sum(float(p.valor) for p in linhas),
                     linhas=len(linhas),
                 )

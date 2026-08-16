@@ -243,14 +243,14 @@ def auditoria_log(limite: int = 20, db: Session = Depends(get_db)) -> list[dict]
 
 
 @router.get("/frota")
-def frota(db: Session = Depends(get_db)) -> dict:
+def frota(mes: str | None = None, unidade: str | None = None, db: Session = Depends(get_db)) -> dict:
     """Rentabilidade de frota própria, por placa. Receita é real (CT-e carrega a placa); custo
     direto por veículo (combustível/manutenção/pedágio) é `nao_determinavel` até existir um
     relatório que amarre esses lançamentos a uma placa — ver app/services/fleet_analytics.py.
     `custos_operacionais_agregados` traz o que É real hoje: combustível e manutenção somados por
     unidade (matriz/filial), nunca ratear isso por veículo sem uma chave de verdade."""
-    veiculos = rentabilidade_por_veiculo(db)
-    custos_agregados = custos_operacionais_agregados(db)
+    veiculos = rentabilidade_por_veiculo(db, mes_referencia=mes, unidade=unidade)
+    custos_agregados = custos_operacionais_agregados(db, mes_referencia=mes, unidade=unidade)
     return {
         "veiculos": [
             {

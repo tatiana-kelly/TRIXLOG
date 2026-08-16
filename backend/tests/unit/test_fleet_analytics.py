@@ -1,9 +1,11 @@
+from datetime import date
+
 from app.models.cte import CTe
 from app.models.pagamento_fornecedor import PagamentoFornecedor
 from app.services.fleet_analytics import custos_operacionais_agregados, rentabilidade_por_veiculo
 
 
-def _cte(numero, placa, dono, total, unidade="matriz", cliente="CLIENTE A"):
+def _cte(numero, placa, dono, total, unidade="matriz", cliente="CLIENTE A", data_emissao=None):
     return CTe(
         cte_numero=numero,
         cte_serie="1",
@@ -12,6 +14,7 @@ def _cte(numero, placa, dono, total, unidade="matriz", cliente="CLIENTE A"):
         proprietario_veiculo_nome=dono,
         total=total,
         unidade=unidade,
+        data_emissao=data_emissao,
     )
 
 
@@ -54,6 +57,26 @@ def test_dono_confirmado_manualmente_conta_como_frota_propria(db_session):
     assert veiculos[0].placa == "RME4C95"
 
 
+def test_rentabilidade_por_veiculo_filtra_por_mes_e_unidade(db_session):
+    db_session.add_all(
+        [
+            _cte("1", "AAA1111", "TRIXLOG TRANSPORTES LTDA", 1000.0, unidade="matriz", data_emissao=date(2026, 7, 10)),
+            _cte("2", "AAA1111", "TRIXLOG TRANSPORTES LTDA", 2000.0, unidade="filial", data_emissao=date(2026, 7, 15)),
+            _cte("3", "AAA1111", "TRIXLOG TRANSPORTES LTDA", 500.0, unidade="matriz", data_emissao=date(2026, 6, 1)),
+        ]
+    )
+    db_session.commit()
+
+    veiculos_julho = rentabilidade_por_veiculo(db_session, mes_referencia="2026-07")
+    assert len(veiculos_julho) == 1
+    assert veiculos_julho[0].viagens == 2
+    assert veiculos_julho[0].receita_total == 3000.0
+
+    veiculos_julho_matriz = rentabilidade_por_veiculo(db_session, mes_referencia="2026-07", unidade="matriz")
+    assert veiculos_julho_matriz[0].viagens == 1
+    assert veiculos_julho_matriz[0].receita_total == 1000.0
+
+
 def test_custos_operacionais_agregados_por_unidade_nunca_por_placa(db_session):
     db_session.add_all(
         [
@@ -78,3 +101,22 @@ def test_custos_operacionais_agregados_por_unidade_nunca_por_placa(db_session):
     assert manutencao_matriz.valor_total == 200.0
 
     assert not any(c.categoria not in {"combustivel", "manutencao"} for c in custos)
+
+
+def test_custos_operacionais_agregados_filtra_por_mes_e_unidade(db_session):
+    db_session.add_all(
+        [
+            PagamentoFornecedor(centro_custo="COMBUSTÍVEIS", valor=500.0, unidade="matriz", dt_emissao=date(2026, 7, 5)),
+            PagamentoFornecedor(centro_custo="COMBUSTÍVEIS", valor=300.0, unidade="matriz", dt_emissao=date(2026, 6, 5)),
+            PagamentoFornecedor(centro_custo="COMBUSTÍVEIS", valor=100.0, unidade="filial", dt_emissao=date(2026, 7, 5)),
+        ]
+    )
+    db_session.commit()
+
+    custos_julho = custos_operacionais_agregados(db_session, mes_referencia="2026-07")
+    combustivel_julho_total = sum(c.valor_total for c in custos_julho if c.categoria == "combustivel")
+    assert combustivel_julho_total == 600.0
+
+    custos_julho_matriz = custos_operacionais_agregados(db_session, mes_referencia="2026-07", unidade="matriz")
+    combustivel_julho_matriz = next(c for c in custos_julho_matriz if c.categoria == "combustivel")
+    assert combustivel_julho_matriz.valor_total == 500.0

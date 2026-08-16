@@ -172,6 +172,14 @@
     <section class="view" id="view-frota">
       <div class="page-header"><div class="page-title">Frota própria — rentabilidade por veículo</div></div>
       <p class="page-sub">Receita é real, direto do CT-e (a placa vai no documento). Custo direto por veículo — combustível, manutenção, pedágio — <strong style="color:var(--ink)">não determinável hoje</strong>: os lançamentos de Contas a Pagar têm posto/oficina e valor, mas nenhuma referência a placa. Aguardando relatório de cartão-combustível, telemetria ou manutenção por veículo para fechar essa análise.</p>
+      <div class="filters-row">
+        <select id="frota-mes"></select>
+        <select id="frota-unidade">
+          <option value="">Matriz + Filial</option>
+          <option value="matriz">Matriz</option>
+          <option value="filial">Filial</option>
+        </select>
+      </div>
       <div id="frota-content">Carregando…</div>
     </section>
 
