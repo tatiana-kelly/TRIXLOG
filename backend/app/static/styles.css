@@ -563,10 +563,12 @@ section.view.active { display: block; animation: view-in 220ms var(--ease-out); 
 .dre-pendente-note strong { color: var(--ink); }
 
 /* ============================== Central de Decisões ============================== */
+/* Borda lateral colorida = mesmo vocabulário de severidade do .recon-card (fila de
+   conciliação) — funcional (codifica crítico/atenção/informação), não decorativa. */
 .decisao-card {
   background: var(--surface-1);
   border: 1px solid var(--border-soft);
-  border-left: 3px solid var(--status-unknown);
+  border-left: 2px solid var(--status-unknown);
   padding: 18px 20px;
   margin-bottom: 16px;
 }
