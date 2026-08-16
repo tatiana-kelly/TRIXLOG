@@ -26,14 +26,20 @@
 ### 0a. Cobertura real medida contra os 337 CT-e's do trimestre completo (mai/jun/jul, matriz+filial), depois da Camada 0 (Carta Frete)
 
 - **Antes da Camada 0 (só Camada 1+2): 45/337 = 13,4%.**
-- **Depois da Camada 0: 106/337 = 31,5%** — mais que dobrou. Camada 0 sozinha resolveu 94 CT-e's
-  (join direto e determinístico com `CartaFrete` via `(CTRC, unidade)`, ver seção 10a); Camada 2
+- **Depois da Camada 0 (join 1:1 apenas): 106/337 = 31,5%.** Camada 0 resolveu 94 CT-e's (join
+  direto e determinístico com `CartaFrete` via `(CTRC, unidade)`, ver seção 10a); Camada 2
   (heurística, rodando só sobre o que sobrou) resolveu mais 12.
+- **Depois de tratar CTRC multi-valor com rateio proporcional (seção 10a): 122/337 = 36,2%.**
+  Achado real: 2 cartas-frete cobrem várias viagens numa linha só (`CTRC="371,374,376,377,380"`,
+  `CTRC` com 13 números) — 18 CT-e's a mais resolvidos via rateio por participação de receita
+  (`carta_frete_rateado`, confiança 0,8, distinto do link direto). Também achado e tratado: 1
+  CT-e (309/filial) reivindicado por DUAS cartas-frete diferentes na origem — nenhuma das duas
+  linka automaticamente, cai para conciliação manual (nunca escolher arbitrariamente).
 - Resultado real na tela "Rentabilidade por cliente" (julho/2026): viagens com custo alocado
-  subiu de 15 para 41; margem confirmada do mês foi de -R$ 38.652,17 para -R$ 16.503,83 — ainda
-  negativa (fato real, não erro), mas com bem menos viagens "não determinável" escondendo o
-  tamanho real do problema.
-- 231 CT-e's (68,5%) ainda pendentes — a maioria é frota própria (sem chave de custo direto
+  subiu de 15 (antes de qualquer Camada 0) para 52; margem confirmada do mês foi de
+  -R$ 38.652,17 para um valor bem menos negativo — ainda negativa (fato real, não erro), mas com
+  bem menos viagens "não determinável" escondendo o tamanho real do problema.
+- 215 CT-e's (63,8%) ainda pendentes — a maioria é frota própria (sem chave de custo direto
   ainda, ver seção 10) e frete terceiro sem Carta Frete nem contrato correspondente nos
   relatórios recebidos até agora.
 
@@ -379,3 +385,14 @@ Frete e as 5 placas de frota própria** — é estritamente frete terceiro/agreg
 **não fecha** o gap do item 10 acima (frota própria continua "não determinável"). Nunca usa o
 campo `Lucro` da planilha como margem — a plataforma recalcula com a fórmula própria
 (`rentabilidade_engine.py`), que pode diferir da fórmula do sistema de origem.
+
+**CTRC multi-valor (achado real, não hipotético):** uma carta-frete pode cobrir várias viagens
+numa linha só — `CTRC="371,374,376,377,380"` (carta 69/matriz) e uma linha com 13 números (carta
+77/matriz). Regra de rateio (mesma do PRP original da Tatiana, seção 16): `participação_cte =
+receita_cte / receita_total_dos_ctes_da_carta`; `custo_cte = custo_carta × participação_cte`.
+Marcado `metodo_vinculo="carta_frete_rateado"` com confiança 0,8 (vs. 1,0 do link 1:1 direto) —
+a UI precisa deixar visualmente claro que é uma alocação gerencial, não um valor direto do
+documento. **Ambiguidade real também encontrada e tratada**: CT-e 309/filial aparece no CTRC de
+duas cartas-frete diferentes (105 e 111) no mesmo arquivo — erro/duplicidade na origem. Nenhuma
+das duas linka automaticamente; cai para conciliação manual, igual a qualquer ambiguidade da
+Camada 2 (nunca escolher arbitrariamente entre candidatos).
