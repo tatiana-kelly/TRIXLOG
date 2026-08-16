@@ -6,11 +6,15 @@ from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.models.carta_frete import CartaFrete
 from app.models.cte import CTe
 from app.models.fatura_receber import FaturaReceber
 from app.models.pagamento_fornecedor import PagamentoFornecedor
+from app.models.viagem_link import ViagemLink
 from app.services.cost_allocation.build_contracts import build_contratos_transporte
+from app.services.cost_allocation.camada0_carta_frete import run_camada0
 from app.services.cost_allocation.heuristic_link import run_camada2
+from app.services.importers.carta_frete_importer import import_carta_frete
 from app.services.importers.contas_pagar_importer import import_contas_pagar
 from app.services.importers.contas_receber_importer import import_contas_receber
 from app.services.importers.cte_importer import import_cte
@@ -22,18 +26,30 @@ EXAMPLES_DIR = Path(__file__).resolve().parents[3] / "examples"
 
 _IMPORTERS = {
     "cte": import_cte,
+    "carta_frete": import_carta_frete,
     "contas_receber": import_contas_receber,
     "contas_pagar": import_contas_pagar,
 }
 
 
 def _rebuild_cost_allocation(db: Session) -> dict:
-    """Reconstrói ContratoTransporte e reroda a Camada 2 sobre TODO o dado já importado —
-    precisa rodar de novo a cada novo arquivo, já que um CT-e importado antes pode agora ter
-    candidato num contrato que só chegou neste upload."""
+    """Reconstrói ContratoTransporte e reroda o Cost Allocation Engine inteiro sobre TODO o dado
+    já importado — precisa rodar de novo a cada novo arquivo, já que um CT-e importado antes
+    pode agora ter candidato num contrato ou carta-frete que só chegou neste upload.
+
+    Ordem importa: limpa ViagemLink uma vez só aqui (não dentro de cada camada, senão uma camada
+    apagaria o que a anterior acabou de resolver) — Camada 0 (join direto com Carta Frete, mais
+    confiável) roda primeiro, Camada 2 (heurística) só processa o que sobrou."""
+    db.query(ViagemLink).delete()
+
     contratos_criados = build_contratos_transporte(db)
-    camada2_stats = run_camada2(db)
-    return {"contratos_transporte_construidos": contratos_criados, "camada2_cost_allocation": camada2_stats}
+    camada0_result = run_camada0(db)
+    camada2_stats = run_camada2(db, cte_ids_ja_resolvidos=camada0_result["cte_ids_resolvidos"])
+    return {
+        "contratos_transporte_construidos": contratos_criados,
+        "camada0_carta_frete": camada0_result["stats"],
+        "camada2_cost_allocation": camada2_stats,
+    }
 
 
 @router.post("/upload")
@@ -103,6 +119,7 @@ def import_status(db: Session = Depends(get_db)) -> dict:
 
     return {
         "cte": {"total": db.query(CTe).count(), "por_mes_unidade": _resumo_meses(CTe, CTe.data_emissao)},
+        "carta_frete": {"total": db.query(CartaFrete).count()},
         "contas_receber": {"total": db.query(FaturaReceber).count()},
         "contas_pagar": {"total": db.query(PagamentoFornecedor).count()},
     }

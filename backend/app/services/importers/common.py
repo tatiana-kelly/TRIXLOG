@@ -43,7 +43,7 @@ def to_date(value) -> date | None:
     return None
 
 
-def to_float(value, default: float = 0.0) -> float:
+def to_float(value, default: float | None = 0.0) -> float | None:
     if _is_missing(value):
         return default
     try:

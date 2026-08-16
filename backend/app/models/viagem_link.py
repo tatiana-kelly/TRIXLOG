@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Float, String
+from sqlalchemy import JSON, DateTime, Float, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -16,6 +16,10 @@ class ViagemLink(Base):
     o Número do CT-e se repete entre meses (ex.: maio vai até 331, junho recomeça em 9), então
     cte_numero sozinho ligaria a viagem errada assim que houvesse mais de um mês de dado.
     cte_numero fica só para exibição/rastreio.
+
+    custo_direto (Camada 0, ver docs/COST_ALLOCATION.md#10a): custo real por viagem vindo direto
+    de CartaFrete (frete terceiro), sem passar por ContratoTransporte — quando preenchido, tem
+    prioridade sobre contrato_transporte_numero no cálculo de rentabilidade.
     """
 
     __tablename__ = "viagem_links"
@@ -24,9 +28,11 @@ class ViagemLink(Base):
     cte_id: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
     cte_numero: Mapped[str] = mapped_column(String, nullable=False, index=True)
     contrato_transporte_numero: Mapped[str | None] = mapped_column(String, nullable=True)
+    carta_frete_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    custo_direto: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True)
     metodo_vinculo: Mapped[str] = mapped_column(
         String, nullable=False, default="nao_vinculado"
-    )  # regex_observacao | heuristica_placa_data | manual | nao_vinculado
+    )  # carta_frete_direto | regex_observacao | heuristica_placa_data | manual | nao_vinculado
     confianca_vinculo: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     status: Mapped[str] = mapped_column(String, nullable=False, default="pendente")  # pendente | resolvido
     candidatos: Mapped[list] = mapped_column(JSON, nullable=False, default=list)

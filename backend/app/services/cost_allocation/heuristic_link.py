@@ -41,11 +41,14 @@ def _names_match(a: str | None, b: str | None) -> bool:
     return a_norm == b_norm or a_norm in b_norm or b_norm in a_norm
 
 
-def run_camada2(db: Session) -> dict:
+def run_camada2(db: Session, cte_ids_ja_resolvidos: set[str] | None = None) -> dict:
+    """cte_ids_ja_resolvidos: CT-e's já linkados pela Camada 0 (carta frete direta) — a Camada 2
+    nunca reprocessa nem sobrescreve isso, só cobre o que sobrou. A limpeza de ViagemLink
+    acontece uma vez só, no orquestrador (app/api/import_.py), antes de Camada 0 e Camada 2
+    rodarem — não aqui, senão a Camada 2 apagaria o que a Camada 0 acabou de resolver."""
     settings = get_settings()
     window = timedelta(days=settings.camada2_max_dias_janela)
-
-    db.query(ViagemLink).delete()
+    cte_ids_ja_resolvidos = cte_ids_ja_resolvidos or set()
 
     contratos = db.query(ContratoTransporte).all()
 
@@ -67,7 +70,8 @@ def run_camada2(db: Session) -> dict:
     claimed: set[tuple[str, str | None]] = set()
 
     ctes_ordenados = sorted(
-        db.query(CTe).all(), key=lambda c: c.data_emissao or c.cte_numero.zfill(10)
+        (c for c in db.query(CTe).all() if c.id not in cte_ids_ja_resolvidos),
+        key=lambda c: c.data_emissao or c.cte_numero.zfill(10),
     )
 
     for cte in ctes_ordenados:

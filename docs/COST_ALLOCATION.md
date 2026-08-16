@@ -23,6 +23,20 @@
   manual (Camada 3) não é um fallback raro — é o caminho principal. Investir ali, não em deixar
   a heurística "mais esperta".**
 
+### 0a. Cobertura real medida contra os 337 CT-e's do trimestre completo (mai/jun/jul, matriz+filial), depois da Camada 0 (Carta Frete)
+
+- **Antes da Camada 0 (só Camada 1+2): 45/337 = 13,4%.**
+- **Depois da Camada 0: 106/337 = 31,5%** — mais que dobrou. Camada 0 sozinha resolveu 94 CT-e's
+  (join direto e determinístico com `CartaFrete` via `(CTRC, unidade)`, ver seção 10a); Camada 2
+  (heurística, rodando só sobre o que sobrou) resolveu mais 12.
+- Resultado real na tela "Rentabilidade por cliente" (julho/2026): viagens com custo alocado
+  subiu de 15 para 41; margem confirmada do mês foi de -R$ 38.652,17 para -R$ 16.503,83 — ainda
+  negativa (fato real, não erro), mas com bem menos viagens "não determinável" escondendo o
+  tamanho real do problema.
+- 231 CT-e's (68,5%) ainda pendentes — a maioria é frota própria (sem chave de custo direto
+  ainda, ver seção 10) e frete terceiro sem Carta Frete nem contrato correspondente nos
+  relatórios recebidos até agora.
+
 ---
 
 ## 1. Modelo de Dados Canônico Proposto
@@ -351,3 +365,17 @@ agregados por veículo sem uma chave real; a tela "Frota própria" mostra "não 
 explicitamente em vez de estimar. **Dado pendente para fechar esta análise**: um relatório com
 placa por lançamento (cartão-combustível, telemetria/rastreador, ou controle de manutenção por
 veículo, e um relatório de pedágio pago pela frota).
+
+10a. **Carta Frete — RESOLVE custo direto de frete terceiro/agregado, NÃO resolve frota própria
+— achado real, não confundir os dois.** A Tatiana enviou "Carta Frete" (6 arquivos reais,
+mai/jun/jul, matriz+filial, 100 linhas úteis) — documento real de acerto com motorista/
+transportador terceiro (CIOT). Tem `CTRC` que é o mesmo número de `CTe.cte_numero` — join
+determinístico, não heurístico, validado batendo o Valor Total exato em casos reais (CTRC 4 →
+CT-e 4 = R$ 6.044,00 idêntico; CTRC 321 matriz → CT-e 321 matriz = R$ 4.200,00 idêntico). Virou
+a **Camada 0** do Cost Allocation Engine (`app/services/cost_allocation/camada0_carta_frete.py`)
+— roda antes da Camada 2, é mais confiável, nunca é reprocessada por ela. Custo direto = `Frete
+do Motorista + Pedágio (Despesa)`. **Confirmado real: zero interseção entre as placas da Carta
+Frete e as 5 placas de frota própria** — é estritamente frete terceiro/agregado, então isto
+**não fecha** o gap do item 10 acima (frota própria continua "não determinável"). Nunca usa o
+campo `Lucro` da planilha como margem — a plataforma recalcula com a fórmula própria
+(`rentabilidade_engine.py`), que pode diferir da fórmula do sistema de origem.

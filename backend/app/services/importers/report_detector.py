@@ -1,10 +1,11 @@
-"""Detecta automaticamente o tipo de relatório (CT-e | Contas a Receber | Contas a Pagar) e a
-unidade (matriz | filial) de um arquivo Excel enviado pela plataforma — é o que dá suporte ao
-botão de importação: o usuário só solta o arquivo, o sistema identifica o resto.
+"""Detecta automaticamente o tipo de relatório (CT-e | Contas a Receber | Contas a Pagar | Carta
+Frete) e a unidade (matriz | filial) de um arquivo Excel enviado pela plataforma — é o que dá
+suporte ao botão de importação: o usuário só solta o arquivo, o sistema identifica o resto.
 
-Assinatura de colunas confirmada nos 18 relatórios reais de maio/junho/julho (matriz e filial,
+Assinatura de colunas confirmada nos relatórios reais de maio/junho/julho (matriz e filial,
 mesmo layout em todos): CT-e tem "Pagador do Frete - Nome"; Contas a Receber tem "Cliente" +
-"Centro de Receita"; Contas a Pagar tem "Fornecedor" + "Centro de Custo".
+"Centro de Receita"; Contas a Pagar tem "Fornecedor" + "Centro de Custo"; Carta Frete tem "CTRC"
++ "Frete do Motorista" (únicas deste relatório — nenhum dos outros 3 tem essas colunas).
 """
 
 import re
@@ -15,6 +16,7 @@ import pandas as pd
 _CTE_SIGNATURE = {"Pagador do Frete - Nome", "Número", "Série"}
 _CONTAS_RECEBER_SIGNATURE = {"Cliente", "Centro de Receita"}
 _CONTAS_PAGAR_SIGNATURE = {"Fornecedor", "Centro de Custo"}
+_CARTA_FRETE_SIGNATURE = {"CTRC", "Frete do Motorista", "Veículo - Placa"}
 
 _UNIDADE_FILENAME_RE = re.compile(r"\b(matriz|filial)\b", re.IGNORECASE)
 
@@ -35,6 +37,8 @@ def detect_report_type(path: str) -> DetectionResult:
 
     if _CTE_SIGNATURE.issubset(columns):
         tipo = "cte"
+    elif _CARTA_FRETE_SIGNATURE.issubset(columns):
+        tipo = "carta_frete"
     elif _CONTAS_RECEBER_SIGNATURE.issubset(columns):
         tipo = "contas_receber"
     elif _CONTAS_PAGAR_SIGNATURE.issubset(columns):
@@ -44,7 +48,7 @@ def detect_report_type(path: str) -> DetectionResult:
             None,
             None,
             len(columns),
-            "nenhuma assinatura de coluna conhecida (CT-e, Contas a Receber, Contas a Pagar) foi encontrada",
+            "nenhuma assinatura de coluna conhecida (CT-e, Carta Frete, Contas a Receber, Contas a Pagar) foi encontrada",
         )
 
     return DetectionResult(tipo, None, len(columns), f"assinatura de {tipo} confirmada")

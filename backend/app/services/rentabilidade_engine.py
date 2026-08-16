@@ -77,11 +77,16 @@ def calcular_rentabilidade_por_cliente(
         custo_alocado = None
         status_alocacao = "pendente"
 
-        if link and link.status == "resolvido" and link.contrato_transporte_numero:
-            contrato = contratos_by_key.get((link.contrato_transporte_numero, cte.unidade))
-            if contrato:
-                custo_alocado = float(contrato.valor_total_contrato)
+        if link and link.status == "resolvido":
+            if link.custo_direto is not None:
+                # Camada 0 — custo real por viagem (Carta Frete), mais confiável que contrato.
+                custo_alocado = float(link.custo_direto)
                 status_alocacao = "resolvido"
+            elif link.contrato_transporte_numero:
+                contrato = contratos_by_key.get((link.contrato_transporte_numero, cte.unidade))
+                if contrato:
+                    custo_alocado = float(contrato.valor_total_contrato)
+                    status_alocacao = "resolvido"
 
         receita = float(cte.total)
         margem = (receita - custo_alocado) if custo_alocado is not None else None
