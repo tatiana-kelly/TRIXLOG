@@ -561,3 +561,66 @@ section.view.active { display: block; animation: view-in 220ms var(--ease-out); 
   margin-bottom: 18px;
 }
 .dre-pendente-note strong { color: var(--ink); }
+
+/* ============================== Central de Decisões ============================== */
+.decisao-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--status-unknown);
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+.decisao-card--critico { border-left-color: var(--status-alert); }
+.decisao-card--atencao { border-left-color: var(--status-pending); }
+.decisao-card--informacao { border-left-color: var(--status-ok); }
+
+.decisao-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.decisao-impacto {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.decisao-situacao {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 14px;
+}
+.decisao-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px 20px;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-hair);
+}
+.decisao-grid p { margin: 3px 0 0; color: var(--ink-dim); font-size: 0.85rem; line-height: 1.5; }
+.decisao-label {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-tertiary);
+}
+.decisao-hipoteses { margin-bottom: 12px; }
+.decisao-hipoteses ul { margin: 6px 0 0; padding-left: 18px; color: var(--ink-dim); font-size: 0.85rem; line-height: 1.6; }
+.decisao-hipoteses li.decisao-recomendada { color: var(--gold); font-weight: 600; }
+.decisao-footer {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border-soft);
+  font-size: 0.78rem;
+  color: var(--ink-tertiary);
+}
+.decisao-footer strong { color: var(--ink); }

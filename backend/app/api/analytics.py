@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.services.decisions_engine import listar_decisoes
 from app.services.dre_engine import calcular_dre
 from app.services.fleet_analytics import custos_operacionais_agregados, rentabilidade_por_veiculo
 from app.services.monthly_analytics import (
@@ -103,6 +104,32 @@ def dre(mes: str | None = None, unidade: str | None = None, db: Session = Depend
         "resultado_gerencial": d.resultado_gerencial,
         "pct_receita_com_custo_terceiro_confirmado": d.pct_receita_com_custo_terceiro_confirmado,
     }
+
+
+@router.get("/decisoes")
+def decisoes(unidade: str | None = None, db: Session = Depends(get_db)) -> list[dict]:
+    """Central de Decisões — aplica .claude/rules/alert-contract.md a dado real já calculado.
+    Causa provável é sempre hipótese, nunca fato — ver app/services/decisions_engine.py."""
+    itens = listar_decisoes(db, unidade=unidade)
+    return [
+        {
+            "tipo": d.tipo,
+            "severidade": d.severidade,
+            "situacao": d.situacao,
+            "evidencia": d.evidencia,
+            "impacto_reais": d.impacto_reais,
+            "onde": d.onde,
+            "hipoteses_causa": d.hipoteses_causa,
+            "confianca": d.confianca,
+            "dado_faltante": d.dado_faltante,
+            "consequencia": d.consequencia,
+            "acoes_possiveis": d.acoes_possiveis,
+            "acao_recomendada": d.acao_recomendada,
+            "dono_papel": d.dono_papel,
+            "kpi_validacao": d.kpi_validacao,
+        }
+        for d in itens
+    ]
 
 
 @router.get("/frota")

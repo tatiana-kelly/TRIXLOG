@@ -31,6 +31,7 @@ document.querySelectorAll(".nav-item").forEach((item) => {
 
 function loadView(view) {
   if (view === "visao-geral") loadVisaoGeral();
+  if (view === "decisoes") loadDecisoes();
   if (view === "dre") loadDRE();
   if (view === "rentabilidade") loadRentabilidade();
   if (view === "comparativo") loadComparativo();
@@ -81,6 +82,75 @@ async function loadVisaoGeral() {
       </div>
       <p class="source-note">fonte: CT-e / Contas a Receber / Contas a Pagar reais, importados via /import/upload</p>
     `;
+  } catch (e) {
+    el.innerHTML = errorState(e);
+  }
+}
+
+// ---------------- central de decisões ----------------
+async function loadDecisoes() {
+  const unidadeSel = document.getElementById("decisoes-unidade");
+  if (!unidadeSel.dataset.bound) {
+    unidadeSel.addEventListener("change", renderDecisoes);
+    unidadeSel.dataset.bound = "1";
+  }
+  renderDecisoes();
+}
+
+const SEVERIDADE_META = {
+  critico: { luz: "alert", label: "CRÍTICO" },
+  atencao: { luz: "pending", label: "ATENÇÃO" },
+  informacao: { luz: "ok", label: "INFORMAÇÃO" },
+};
+
+async function renderDecisoes() {
+  const el = document.getElementById("decisoes-content");
+  const unidade = document.getElementById("decisoes-unidade").value;
+  el.innerHTML = scanning("Sincronizando dado");
+  try {
+    const decisoes = await api(`/analytics/decisoes${unidade ? "?unidade=" + unidade : ""}`);
+    if (!decisoes.length) {
+      el.innerHTML = emptyState("Nenhuma decisão prioritária no momento.", "Nenhum cliente com margem confirmada negativa nem desvio material detectado.");
+      return;
+    }
+
+    el.innerHTML = decisoes
+      .map((d) => {
+        const sev = SEVERIDADE_META[d.severidade] || SEVERIDADE_META.informacao;
+        const hipoteses = d.hipoteses_causa.map((h) => `<li>${esc(h)}</li>`).join("");
+        const acoes = d.acoes_possiveis
+          .map((a) => `<li${a === d.acao_recomendada ? ' class="decisao-recomendada"' : ""}>${esc(a)}</li>`)
+          .join("");
+        return `
+        <div class="decisao-card decisao-card--${d.severidade}">
+          <div class="decisao-top">
+            <span class="pill pill--${d.severidade === "critico" ? "danger" : d.severidade === "atencao" ? "warn" : "ok"}">
+              <span class="radar-light radar-light--${sev.luz}"></span>${sev.label}
+            </span>
+            <span class="decisao-impacto">${brl(d.impacto_reais)}</span>
+          </div>
+          <div class="decisao-situacao">${esc(d.situacao)}</div>
+          <div class="decisao-grid">
+            <div><span class="decisao-label">Evidência</span><p>${esc(d.evidencia)}</p></div>
+            <div><span class="decisao-label">Onde está concentrado</span><p>${esc(d.onde)}</p></div>
+            <div><span class="decisao-label">Consequência de não agir</span><p>${esc(d.consequencia)}</p></div>
+            <div><span class="decisao-label">Dado faltante</span><p>${esc(d.dado_faltante)}</p></div>
+          </div>
+          <div class="decisao-hipoteses">
+            <span class="decisao-label">Hipóteses de causa (confiança: ${esc(d.confianca)} — não são fato confirmado)</span>
+            <ul>${hipoteses}</ul>
+          </div>
+          <div class="decisao-hipoteses">
+            <span class="decisao-label">Ações possíveis — recomendada em destaque</span>
+            <ul>${acoes}</ul>
+          </div>
+          <div class="decisao-footer">
+            <span>Dono: <strong>${esc(d.dono_papel)}</strong></span>
+            <span>KPI de validação: ${esc(d.kpi_validacao)}</span>
+          </div>
+        </div>`;
+      })
+      .join("");
   } catch (e) {
     el.innerHTML = errorState(e);
   }
