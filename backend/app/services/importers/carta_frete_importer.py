@@ -61,6 +61,7 @@ def import_carta_frete(path: str, db: Session, unidade: str | None = None, arqui
             valor_total=to_float(row.get("Valor Total")),
             frete_motorista=to_float(row.get("Frete do Motorista")),
             pedagio_despesa=to_float(row.get("Pedágio (Despesa)")),
+            adto_vale_abastecimento=to_float(row.get("Adto. Vale Abastec.")),
             lucro_planilha=to_float(row.get("Lucro"), default=None),
             unidade=unidade,
             arquivo_origem=arquivo_origem,

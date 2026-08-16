@@ -207,6 +207,11 @@ async function renderDRE() {
         ? `<p class="dre-pendente-note"><span class="radar-light radar-light--pending"></span>${d.custo_frete_terceiro_pendente.qtd_ctes} CT-e's (${brl(d.custo_frete_terceiro_pendente.receita)} em receita) ainda sem custo de frete terceiro confirmado — <strong>não entraram no cálculo abaixo</strong>, não são custo zero. Margem de contribuição considera só ${pct(d.pct_receita_com_custo_terceiro_confirmado)} da receita com custo confirmado.</p>`
         : "";
 
+    const riscoCombustivelAlerta =
+      d.combustivel_risco_sobreposicao_terceiro > 0
+        ? `<p class="dre-pendente-note"><span class="radar-light radar-light--unknown"></span><strong>Risco não conciliado:</strong> ${brl(d.combustivel_risco_sobreposicao_terceiro)} de vale-combustível de terceiro (já embutido no Frete do Motorista) pode se sobrepor à linha "Combustível" abaixo — sem chave que ligue Carta Frete a Contas a Pagar de combustível, não é possível confirmar nem descartar. Nunca deduzido automaticamente.</p>`
+        : "";
+
     el.innerHTML = `
       <div class="kpi-row">
         <div class="kpi-card"><div class="kpi-label">Receita operacional</div><div class="kpi-value">${brl(d.receita_operacional)}</div></div>
@@ -215,6 +220,7 @@ async function renderDRE() {
         <div class="kpi-card"><div class="kpi-label">Receita c/ custo terceiro confirmado</div><div class="kpi-value">${pct(d.pct_receita_com_custo_terceiro_confirmado)}</div></div>
       </div>
       ${pendenteAlerta}
+      ${riscoCombustivelAlerta}
       <div class="table-wrap">
         <table class="dre-table">
           <tbody>
@@ -767,7 +773,10 @@ async function renderQualidade() {
     const qs = new URLSearchParams();
     if (mes) qs.set("mes", mes);
     if (unidade) qs.set("unidade", unidade);
-    const itens = await api(`/analytics/auditoria/reconciliacao?${qs.toString()}`);
+    const [itens, log] = await Promise.all([
+      api(`/analytics/auditoria/reconciliacao?${qs.toString()}`),
+      api("/analytics/auditoria/log?limite=10"),
+    ]);
 
     const rows = itens
       .map((i) => {
@@ -787,11 +796,31 @@ async function renderQualidade() {
       .join("");
 
     const todasConciliadas = itens.every((i) => i.status !== "divergente");
+    const ultima = log[0];
+
+    const logRows = log
+      .map((run) => {
+        const mudancas = Object.entries(run.mudancas_desde_auditoria_anterior);
+        const resumoMudancas = mudancas.length
+          ? mudancas.map(([campo, d]) => `${esc(campo)}: ${brl(d.anterior)} → ${brl(d.atual)}`).join("; ")
+          : "sem mudança desde a auditoria anterior";
+        return `
+      <tr>
+        <td class="mono">${new Date(run.executed_at).toLocaleString("pt-BR")}</td>
+        <td>${esc(run.trigger)}</td>
+        <td>${esc(run.calculation_version)}</td>
+        <td>${brl(run.metrics.resultado_gerencial)}</td>
+        <td style="color:${mudancas.length ? "var(--status-pending)" : "var(--ink-tertiary)"}">${resumoMudancas}</td>
+      </tr>`;
+      })
+      .join("");
 
     el.innerHTML = `
       <div class="kpi-row">
         <div class="kpi-card"><div class="kpi-label">Status geral</div><div class="kpi-value ${todasConciliadas ? "" : "warn"}">${todasConciliadas ? "SEM DIVERGÊNCIAS" : "DIVERGÊNCIA REAL ENCONTRADA"}</div></div>
         <div class="kpi-card"><div class="kpi-label">Indicadores auditados</div><div class="kpi-value">${itens.length}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Última auditoria</div><div class="kpi-value" style="font-size:1rem">${ultima ? new Date(ultima.executed_at).toLocaleString("pt-BR") : "—"}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Versão do cálculo</div><div class="kpi-value gold" style="font-size:1rem">${ultima ? esc(ultima.calculation_version) : "—"}</div></div>
       </div>
       <div class="table-wrap">
         <table class="qualidade-table">
@@ -800,6 +829,15 @@ async function renderQualidade() {
         </table>
       </div>
       <p class="source-note">Cada linha é recalculada por um caminho de código independente (soma registro a registro) e comparada com o valor da DRE — tolerância de R$ 0,05 para arredondamento, qualquer coisa acima disso vira DIVERGENTE.</p>
+
+      <div class="page-header" style="margin-top:32px"><div class="page-title" style="font-size:1rem">Histórico de auditorias</div></div>
+      <p class="page-sub">Um snapshot por reprocessamento — número nunca muda em silêncio, se mudou aparece aqui.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Quando</th><th>Gatilho</th><th>Versão</th><th style="text-align:right">Resultado Gerencial</th><th>Mudanças desde a anterior</th></tr></thead>
+          <tbody>${logRows || '<tr><td colspan="5" style="color:var(--ink-tertiary)">Nenhuma auditoria registrada ainda — importe um relatório para gerar a primeira.</td></tr>'}</tbody>
+        </table>
+      </div>
     `;
 
     document.querySelectorAll(".dre-linha-auditavel").forEach((tr) => {

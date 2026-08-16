@@ -35,6 +35,7 @@ def get_db() -> Session:
 _COLUNAS_ADICIONADAS_POS_CRIACAO = [
     ("viagem_links", "carta_frete_id", "VARCHAR"),
     ("viagem_links", "custo_direto", "NUMERIC(14,2)"),
+    ("cartas_frete", "adto_vale_abastecimento", "NUMERIC(14,2) NOT NULL DEFAULT 0"),
 ]
 
 

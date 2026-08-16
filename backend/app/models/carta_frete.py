@@ -31,8 +31,18 @@ class CartaFrete(Base):
     ctrc: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
 
     valor_total: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False, default=0)
+    # Frete do Motorista = custo bruto contratado do terceiro (fonte única de verdade do custo —
+    # nunca somar adiantamento/saldo/vale por cima, são só formas de LIQUIDAR esse mesmo valor,
+    # não custo adicional. Achado real confirmado com a Tatiana em 2026-08-16).
     frete_motorista: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False, default=0)
     pedagio_despesa: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False, default=0)
+    # Parte do Frete do Motorista liquidada como vale-combustível ao terceiro (não é custo
+    # adicional — é uma FORMA de pagar o frete_motorista acima). Guardado só para expor o risco
+    # de sobreposição com PagamentoFornecedor.centro_custo="COMBUSTÍVEIS": se a TRIXLOG paga o
+    # posto direto para cobrir esse vale, o mesmo evento pode aparecer nos dois relatórios. Sem
+    # chave que ligue os dois (Contas a Pagar de combustível não referencia motorista/CTRC/carta),
+    # não dá pra confirmar nem descartar a sobreposição — só declarar como risco não conciliado.
+    adto_vale_abastecimento: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False, default=0)
     lucro_planilha: Mapped[float | None] = mapped_column(
         Numeric(14, 2), nullable=True
     )  # informativo — nunca usado como margem da plataforma, recalculamos com fórmula própria

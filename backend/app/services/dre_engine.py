@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
 
+from app.models.carta_frete import CartaFrete
 from app.models.cte import CTe
 from app.models.pagamento_fornecedor import PagamentoFornecedor
 from app.services.custo_lookup import custo_confirmado_por_cte
@@ -35,6 +36,7 @@ class DRE:
     custo_frete_terceiro_pendente_receita: float = 0.0
     custo_frete_terceiro_pendente_qtd_ctes: int = 0
     combustivel: float = 0.0
+    combustivel_risco_sobreposicao_terceiro: float = 0.0
     manutencao: float = 0.0
     margem_contribuicao: float = 0.0
     despesas_operacionais: dict[str, float] = field(default_factory=dict)
@@ -90,6 +92,22 @@ def calcular_dre(db: Session, mes_referencia: str | None = None, unidade: str | 
 
     dre.combustivel = _soma_categoria(lambda cc: "OMBUST" in cc)
     dre.manutencao = _soma_categoria(lambda cc: "ANUTEN" in cc)
+
+    # Risco de sobreposição — achado real confirmado com a Tatiana (2026-08-16): a Carta Frete
+    # tem um campo "Adto. Vale Abastec." (parte do Frete do Motorista liquidada como vale-
+    # combustível ao terceiro). Se a TRIXLOG paga o posto direto pra cobrir esse vale, o mesmo
+    # evento pode aparecer TAMBÉM em Contas a Pagar como "COMBUSTÍVEIS" — dupla contagem em
+    # potencial (uma vez dentro do custo_frete_terceiro_confirmado via Frete do Motorista bruto,
+    # outra vez aqui). Sem chave que ligue os dois relatórios (Contas a Pagar de combustível não
+    # referencia motorista/CTRC/carta-frete), NÃO dá pra confirmar nem descartar — só declarar.
+    # Nunca subtraído automaticamente: seria inventar uma dedução sem prova.
+    cartas_query = db.query(CartaFrete)
+    if unidade:
+        cartas_query = cartas_query.filter(CartaFrete.unidade == unidade)
+    cartas = cartas_query.all()
+    if mes_referencia:
+        cartas = [c for c in cartas if c.data_emissao and c.data_emissao.strftime("%Y-%m") == mes_referencia]
+    dre.combustivel_risco_sobreposicao_terceiro = sum(float(c.adto_vale_abastecimento) for c in cartas)
 
     dre.margem_contribuicao = dre.receita_operacional - dre.custo_frete_terceiro_confirmado - dre.combustivel - dre.manutencao
 

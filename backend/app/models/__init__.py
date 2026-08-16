@@ -1,3 +1,4 @@
+from app.models.audit_run import AuditRun
 from app.models.carta_frete import CartaFrete
 from app.models.contrato_transporte import ContratoTransporte
 from app.models.cte import CTe
@@ -6,6 +7,7 @@ from app.models.pagamento_fornecedor import PagamentoFornecedor
 from app.models.viagem_link import ViagemLink
 
 __all__ = [
+    "AuditRun",
     "CTe",
     "CartaFrete",
     "ContratoTransporte",

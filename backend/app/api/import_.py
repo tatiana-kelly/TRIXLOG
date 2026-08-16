@@ -11,6 +11,7 @@ from app.models.cte import CTe
 from app.models.fatura_receber import FaturaReceber
 from app.models.pagamento_fornecedor import PagamentoFornecedor
 from app.models.viagem_link import ViagemLink
+from app.services.audit_log import registrar_auditoria
 from app.services.cost_allocation.build_contracts import build_contratos_transporte
 from app.services.cost_allocation.camada0_carta_frete import run_camada0
 from app.services.cost_allocation.heuristic_link import run_camada2
@@ -45,10 +46,14 @@ def _rebuild_cost_allocation(db: Session) -> dict:
     contratos_criados = build_contratos_transporte(db)
     camada0_result = run_camada0(db)
     camada2_stats = run_camada2(db, cte_ids_ja_resolvidos=camada0_result["cte_ids_resolvidos"])
+
+    auditoria = registrar_auditoria(db, trigger="import_upload")
+
     return {
         "contratos_transporte_construidos": contratos_criados,
         "camada0_carta_frete": camada0_result["stats"],
         "camada2_cost_allocation": camada2_stats,
+        "auditoria_registrada_em": auditoria.executed_at.isoformat(),
     }
 
 

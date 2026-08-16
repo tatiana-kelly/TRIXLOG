@@ -181,12 +181,16 @@ def reconciliar_dre(db: Session, mes_referencia: str | None = None, unidade: str
 
     combustivel_recalc = sum(l.valor for l in composicao_categoria_pagamento(db, lambda cc: "OMBUST" in cc, mes_referencia, unidade))
     diff = dre.combustivel - combustivel_recalc
-    itens.append(
-        ItemReconciliacao(
-            "Combustível (frota própria)", dre.combustivel, combustivel_recalc, diff,
-            _status_diferenca(diff) or "conciliado",
-            "Soma real de Contas a Pagar — sem chave de placa (agregado empresa/unidade, ver docs/COST_ALLOCATION.md#10).",
+    status_combustivel = _status_diferenca(diff) or ("parcial" if dre.combustivel_risco_sobreposicao_terceiro else "conciliado")
+    nota_combustivel = "Soma real de Contas a Pagar — sem chave de placa (agregado empresa/unidade, ver docs/COST_ALLOCATION.md#10)."
+    if dre.combustivel_risco_sobreposicao_terceiro:
+        nota_combustivel += (
+            f" RISCO NÃO CONCILIADO: R$ {brl(dre.combustivel_risco_sobreposicao_terceiro)} de vale-combustível de terceiro"
+            " (Carta Frete, já incluído no custo de frete terceiro) pode se sobrepor a este valor —"
+            " sem chave que ligue os dois relatórios, não é possível confirmar nem descartar. Nunca deduzido automaticamente."
         )
+    itens.append(
+        ItemReconciliacao("Combustível (frota própria)", dre.combustivel, combustivel_recalc, diff, status_combustivel, nota_combustivel)
     )
 
     manutencao_recalc = sum(l.valor for l in composicao_categoria_pagamento(db, lambda cc: "ANUTEN" in cc, mes_referencia, unidade))

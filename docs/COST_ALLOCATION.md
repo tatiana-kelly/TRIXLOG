@@ -396,3 +396,45 @@ documento. **Ambiguidade real também encontrada e tratada**: CT-e 309/filial ap
 duas cartas-frete diferentes (105 e 111) no mesmo arquivo — erro/duplicidade na origem. Nenhuma
 das duas linka automaticamente; cai para conciliação manual, igual a qualquer ambiguidade da
 Camada 2 (nunca escolher arbitrariamente entre candidatos).
+
+10b. **Auditoria forense pedida pela Tatiana (2026-08-16) — três números diferentes de "frete
+terceiro de julho", nenhum errado, medem coisas diferentes.**
+
+- **R$ 269.300,00** — soma bruta de `Frete do Motorista` em TODAS as linhas dos arquivos
+  rotulados "julho" (Carta Frete), ligadas ou não a um CT-e.
+- **R$ 258.350,00** — soma de `PagamentoFornecedor` com `centro_custo` em `FRETE TERCEIRO`/
+  `FRETES TERCEIROS` com `dt_emissao` em julho (73 lançamentos, todos `tipo_documento=
+  contrato_transporte`) — são registros de PAGAMENTO (adiantamento/saldo), não de custo
+  reconhecido; podem estar liquidando contratos de CT-e's de outros meses ou já cobertos via
+  Carta Frete (Camada 0), então nunca devem ser somados por cima do que a DRE já reconhece.
+- **R$ 292.249,98** — o número da DRE, correto: soma de `custo_direto_por_cte()` só para CT-e's
+  cuja **competência** (data de emissão) é julho. Decompõe em R$ 236.449,98 de Carta Frete
+  (CT-e's realmente de julho — R$ 29.149,99 dos arquivos "julho" na verdade liquidam CT-e's de
+  **junho**, competência diferente da data do documento de acerto) + R$ 55.800,00 via Contrato/
+  Contas a Pagar (Camada 2, para 4 CT-e's confirmados sem nenhuma Carta Frete correspondente) +
+  R$ 3.700,00 corretamente excluído (CT-e 309/filial, ambiguidade do item acima).
+- **Confirmado, não presumido**: nenhum dos 4 CT-e's resolvidos via Camada 2 em julho tem Carta
+  Frete correspondente (checado um a um) — não há dupla contagem entre Camada 0 e Camada 2 (é
+  estruturalmente impossível: cada `ViagemLink` usa `custo_direto` OU `contrato_transporte_numero`,
+  nunca os dois ao mesmo tempo).
+- **Manutenção (R$ 11.950,14 apontado vs. R$ 11.180,14 da DRE) e Administrativas (R$ 14.685,00
+  apontado vs. R$ 10.085,00 da DRE)**: auditados contra três agrupamentos independentes
+  (`dt_emissao`, `dt_pagamento`, `arquivo_origem`) — `dt_emissao` e `arquivo_origem` **sempre
+  concordam exatamente** com o valor da DRE; nenhuma variação de agrupamento reproduz os valores
+  apontados. Não é um bug encontrado — provavelmente uma estimativa aproximada feita à mão sobre
+  a planilha bruta (a própria mensagem os descreve como "aproximadamente").
+
+**Risco real identificado e agora exposto (não escondido, não deduzido sem prova):** a Carta
+Frete tem o campo `Adto. Vale Abastec.` (parte do `Frete do Motorista` liquidada como vale-
+combustível ao motorista terceiro) — **R$ 4.786,85 em julho, R$ 8.386,85 no trimestre**, agora
+capturado em `CartaFrete.adto_vale_abastecimento`. Se a TRIXLOG paga o posto de combustível
+diretamente para cobrir esse vale, o mesmo evento econômico pode aparecer TAMBÉM em
+`PagamentoFornecedor` como `COMBUSTÍVEIS` — uma dupla contagem em potencial (uma vez embutido no
+`Frete do Motorista` bruto que já vira `custo_direto`, outra vez na linha "Combustível" da DRE,
+que é 100% independente). **Não é possível confirmar nem descartar com os dados atuais**:
+`PagamentoFornecedor` de combustível não referencia motorista, placa, CTRC nem contrato — não
+existe chave que ligue os dois relatórios. Por isso a plataforma NUNCA subtrai esse valor
+automaticamente (seria inventar uma dedução sem prova) — só declara o risco, quantificado, na
+tela de Qualidade dos Dados e no alerta da DRE. Fica registrado como dado pendente para fechar:
+um relatório de conciliação de vale-combustível (nota do posto ↔ motorista/placa/carta-frete)
+resolveria isso com certeza.

@@ -1,10 +1,26 @@
 from datetime import date
 
+from app.models.carta_frete import CartaFrete
 from app.models.contrato_transporte import ContratoTransporte
 from app.models.cte import CTe
 from app.models.pagamento_fornecedor import PagamentoFornecedor
 from app.models.viagem_link import ViagemLink
 from app.services.dre_engine import calcular_dre
+
+
+def test_expoe_risco_de_sobreposicao_combustivel_vs_vale_terceiro_sem_deduzir(db_session):
+    """Achado real (2026-08-16): Adto. Vale Abastec. da Carta Frete pode se sobrepor com
+    Contas a Pagar/COMBUSTÍVEIS -- sem chave que ligue os dois relatórios, a plataforma nunca
+    deduz automaticamente (seria inventar), só declara o risco quantificado."""
+    db_session.add(CTe(cte_numero="1", cte_serie="1", pagador_frete_nome="A", total=1000.0, unidade="matriz"))
+    db_session.add(CartaFrete(numero="1", ctrc="1", unidade="matriz", frete_motorista=5000.0, adto_vale_abastecimento=2000.0))
+    db_session.add(PagamentoFornecedor(centro_custo="COMBUSTÍVEIS", valor=10000.0, unidade="matriz"))
+    db_session.commit()
+
+    dre = calcular_dre(db_session)
+
+    assert dre.combustivel == 10000.0  # nunca deduzido automaticamente
+    assert dre.combustivel_risco_sobreposicao_terceiro == 2000.0  # mas o risco fica exposto
 
 
 def test_receita_e_sempre_soma_real_de_todos_os_ctes(db_session):

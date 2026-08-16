@@ -8,6 +8,7 @@ from app.services.audit_engine import (
     composicao_receita,
     reconciliar_dre,
 )
+from app.services.audit_log import listar_auditorias
 from app.services.decisions_engine import listar_decisoes
 from app.services.dre_engine import calcular_dre
 from app.services.fleet_analytics import custos_operacionais_agregados, rentabilidade_por_veiculo
@@ -103,6 +104,7 @@ def dre(mes: str | None = None, unidade: str | None = None, db: Session = Depend
             "qtd_ctes": d.custo_frete_terceiro_pendente_qtd_ctes,
         },
         "combustivel": d.combustivel,
+        "combustivel_risco_sobreposicao_terceiro": d.combustivel_risco_sobreposicao_terceiro,
         "manutencao": d.manutencao,
         "margem_contribuicao": d.margem_contribuicao,
         "despesas_operacionais": d.despesas_operacionais,
@@ -231,6 +233,13 @@ def auditoria_composicao(
             for i in itens
         ],
     }
+
+
+@router.get("/auditoria/log")
+def auditoria_log(limite: int = 20, db: Session = Depends(get_db)) -> list[dict]:
+    """Histórico de auditorias — um snapshot por reprocessamento, com o que mudou desde a
+    anterior. Nunca altera número silenciosamente — ver app/services/audit_log.py."""
+    return listar_auditorias(db, limite=limite)
 
 
 @router.get("/frota")
