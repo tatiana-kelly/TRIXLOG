@@ -20,18 +20,25 @@ class ResolveLinkRequest(BaseModel):
 @router.get("/pending")
 def list_pending(db: Session = Depends(get_db)) -> list[dict]:
     """Camada 3 — fila de conciliação manual (docs/COST_ALLOCATION.md#2). Junta com CTe para dar
-    contexto real ao operador (cliente, mês, unidade) — cte_numero sozinho é ambíguo entre meses."""
+    contexto real ao operador (cliente, mês, unidade) — cte_numero sozinho é ambíguo entre meses.
+
+    Busca tudo em lote (CTe's e Contratos de uma vez, não um SELECT por link/candidato) — um N+1
+    aqui é invisível no SQLite local (latência zero) mas trava contra Postgres remoto assim que a
+    fila cresce (confirmado: 115 pendentes = centenas de round-trips de rede, timeout real)."""
     links = db.query(ViagemLink).filter(ViagemLink.status == "pendente").all()
+
+    cte_ids = {link.cte_id for link in links}
+    ctes_por_id = {c.id: c for c in db.query(CTe).filter(CTe.id.in_(cte_ids)).all()} if cte_ids else {}
+
+    todos_contratos = db.query(ContratoTransporte).all()
+    contratos_por_chave = {(c.contrato_numero, c.unidade): c for c in todos_contratos}
+
     out = []
     for link in links:
-        cte = db.get(CTe, link.cte_id)
+        cte = ctes_por_id.get(link.cte_id)
         candidatos_detalhados = []
         for numero in link.candidatos:
-            contrato = (
-                db.query(ContratoTransporte)
-                .filter(ContratoTransporte.contrato_numero == numero, ContratoTransporte.unidade == (cte.unidade if cte else None))
-                .first()
-            )
+            contrato = contratos_por_chave.get((numero, cte.unidade if cte else None))
             candidatos_detalhados.append(
                 {
                     "contrato_numero": numero,

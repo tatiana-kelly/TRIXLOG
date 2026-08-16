@@ -3,7 +3,6 @@ import tempfile
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, UploadFile
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -92,12 +91,15 @@ def import_status(db: Session = Depends(get_db)) -> dict:
     mostrar isso em cada módulo (nunca apresentar análise sem dizer de onde/quando veio)."""
 
     def _resumo_meses(model, date_field):
-        rows = (
-            db.query(func.strftime("%Y-%m", date_field), model.unidade, func.count())
-            .group_by(func.strftime("%Y-%m", date_field), model.unidade)
-            .all()
-        )
-        return [{"mes": mes, "unidade": unidade, "quantidade": qtd} for mes, unidade, qtd in rows if mes]
+        # Agrupado em Python, não em SQL (func.strftime é SQLite-only — quebra no Postgres).
+        rows = db.query(date_field, model.unidade).all()
+        contagem: dict[tuple[str, str | None], int] = {}
+        for data, unidade in rows:
+            if not data:
+                continue
+            chave = (data.strftime("%Y-%m"), unidade)
+            contagem[chave] = contagem.get(chave, 0) + 1
+        return [{"mes": mes, "unidade": unidade, "quantidade": qtd} for (mes, unidade), qtd in contagem.items()]
 
     return {
         "cte": {"total": db.query(CTe).count(), "por_mes_unidade": _resumo_meses(CTe, CTe.data_emissao)},

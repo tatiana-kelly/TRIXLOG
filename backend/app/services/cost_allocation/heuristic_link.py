@@ -48,17 +48,20 @@ def run_camada2(db: Session) -> dict:
     db.query(ViagemLink).delete()
 
     contratos = db.query(ContratoTransporte).all()
-    contrato_dates: dict[tuple[str, str | None], list] = {}
-    for c in contratos:
-        rows = (
-            db.query(PagamentoFornecedor)
-            .filter(PagamentoFornecedor.numero_documento == c.contrato_numero)
-            .filter(PagamentoFornecedor.unidade == c.unidade)
-            .filter(PagamentoFornecedor.tipo_documento == "contrato_transporte")
-            .all()
-        )
-        dates = [r.dt_emissao for r in rows if r.dt_emissao]
-        contrato_dates[(c.contrato_numero, c.unidade)] = dates
+
+    # 1 query para todos os pagamentos de contrato_transporte (era 1 por contrato — 99 round-trips
+    # de rede contra Postgres remoto, invisível no SQLite local).
+    pagamentos_contrato = (
+        db.query(PagamentoFornecedor).filter(PagamentoFornecedor.tipo_documento == "contrato_transporte").all()
+    )
+    datas_por_chave: dict[tuple[str, str | None], list] = {}
+    for p in pagamentos_contrato:
+        if p.dt_emissao:
+            datas_por_chave.setdefault((p.numero_documento, p.unidade), []).append(p.dt_emissao)
+
+    contrato_dates: dict[tuple[str, str | None], list] = {
+        (c.contrato_numero, c.unidade): datas_por_chave.get((c.contrato_numero, c.unidade), []) for c in contratos
+    }
 
     stats = {"auto_linked": 0, "ambiguous": 0, "no_candidate": 0, "no_date": 0, "candidate_already_claimed": 0}
     claimed: set[tuple[str, str | None]] = set()
