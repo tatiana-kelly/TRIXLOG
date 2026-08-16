@@ -31,6 +31,7 @@ document.querySelectorAll(".nav-item").forEach((item) => {
 
 function loadView(view) {
   if (view === "visao-geral") loadVisaoGeral();
+  if (view === "dre") loadDRE();
   if (view === "rentabilidade") loadRentabilidade();
   if (view === "comparativo") loadComparativo();
   if (view === "desvios") loadDesviosFilters();
@@ -79,6 +80,83 @@ async function loadVisaoGeral() {
         </table>
       </div>
       <p class="source-note">fonte: CT-e / Contas a Receber / Contas a Pagar reais, importados via /import/upload</p>
+    `;
+  } catch (e) {
+    el.innerHTML = errorState(e);
+  }
+}
+
+// ---------------- DRE gerencial ----------------
+async function loadDRE() {
+  const mesSel = document.getElementById("dre-mes");
+  const unidadeSel = document.getElementById("dre-unidade");
+  if (!mesSel.dataset.loaded) {
+    await populateMonthSelect(mesSel, { includeEmpty: true });
+    mesSel.insertAdjacentHTML("afterbegin", `<option value="">Todo o período</option>`);
+    mesSel.value = "";
+    mesSel.dataset.loaded = "1";
+    mesSel.addEventListener("change", renderDRE);
+    unidadeSel.addEventListener("change", renderDRE);
+  }
+  renderDRE();
+}
+
+function linhaDRE(label, valor, { destaque, indent } = {}) {
+  return `<tr class="${destaque ? "dre-subtotal" : ""}">
+    <td style="${indent ? "padding-left:28px;color:var(--ink-dim)" : ""}">${esc(label)}</td>
+    <td class="num">${brl(valor)}</td>
+  </tr>`;
+}
+
+async function renderDRE() {
+  const el = document.getElementById("dre-content");
+  const mes = document.getElementById("dre-mes").value;
+  const unidade = document.getElementById("dre-unidade").value;
+  el.innerHTML = scanning("Sincronizando dado");
+  try {
+    const qs = new URLSearchParams();
+    if (mes) qs.set("mes", mes);
+    if (unidade) qs.set("unidade", unidade);
+    const d = await api(`/analytics/dre?${qs.toString()}`);
+
+    if (!d.receita_operacional) {
+      el.innerHTML = emptyState("Nenhum CT-e neste período/unidade.");
+      return;
+    }
+
+    const despesasRows = Object.entries(d.despesas_operacionais)
+      .map(([label, valor]) => linhaDRE(label, -valor, { indent: true }))
+      .join("");
+
+    const pendenteAlerta =
+      d.custo_frete_terceiro_pendente.qtd_ctes > 0
+        ? `<p class="dre-pendente-note"><span class="radar-light radar-light--pending"></span>${d.custo_frete_terceiro_pendente.qtd_ctes} CT-e's (${brl(d.custo_frete_terceiro_pendente.receita)} em receita) ainda sem custo de frete terceiro confirmado — <strong>não entraram no cálculo abaixo</strong>, não são custo zero. Margem de contribuição considera só ${pct(d.pct_receita_com_custo_terceiro_confirmado)} da receita com custo confirmado.</p>`
+        : "";
+
+    el.innerHTML = `
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label">Receita operacional</div><div class="kpi-value">${brl(d.receita_operacional)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Margem de contribuição</div><div class="kpi-value ${d.margem_contribuicao >= 0 ? "gold" : "warn"}">${brl(d.margem_contribuicao)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Resultado gerencial</div><div class="kpi-value ${d.resultado_gerencial >= 0 ? "gold" : "warn"}">${brl(d.resultado_gerencial)}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Receita c/ custo terceiro confirmado</div><div class="kpi-value">${pct(d.pct_receita_com_custo_terceiro_confirmado)}</div></div>
+      </div>
+      ${pendenteAlerta}
+      <div class="table-wrap">
+        <table class="dre-table">
+          <tbody>
+            ${linhaDRE("Receita Operacional (CT-e)", d.receita_operacional, { destaque: true })}
+            ${linhaDRE("Custo direto — frete terceiro (confirmado)", -d.custo_frete_terceiro_confirmado, { indent: true })}
+            ${linhaDRE("Combustível (frota própria)", -d.combustivel, { indent: true })}
+            ${linhaDRE("Manutenção (frota própria)", -d.manutencao, { indent: true })}
+            ${linhaDRE("= Margem de Contribuição Operacional", d.margem_contribuicao, { destaque: true })}
+            ${despesasRows}
+            ${linhaDRE("= Resultado Operacional Gerencial", d.resultado_operacional, { destaque: true })}
+            ${linhaDRE("Despesas financeiras", -d.despesas_financeiras, { indent: true })}
+            ${linhaDRE("= Resultado Gerencial", d.resultado_gerencial, { destaque: true })}
+          </tbody>
+        </table>
+      </div>
+      <p class="source-note">mês: ${mes ? esc(mes) : "todo o período"} · unidade: ${unidade ? esc(unidade) : "matriz + filial"} · fonte: CT-e + Contas a Pagar reais + Cost Allocation Engine</p>
     `;
   } catch (e) {
     el.innerHTML = errorState(e);

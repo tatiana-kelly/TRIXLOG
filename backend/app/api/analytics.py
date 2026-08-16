@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.services.dre_engine import calcular_dre
 from app.services.fleet_analytics import custos_operacionais_agregados, rentabilidade_por_veiculo
 from app.services.monthly_analytics import (
     comparativo_mensal,
@@ -77,6 +78,31 @@ def desvios(mes_atual: str, mes_anterior: str, unidade: str | None = None, db: S
         }
         for d in itens
     ]
+
+
+@router.get("/dre")
+def dre(mes: str | None = None, unidade: str | None = None, db: Session = Depends(get_db)) -> dict:
+    """DRE Gerencial — receita sempre 100% real; custo de frete terceiro só entra pela parte
+    confirmada (Camada 0/2), o resto aparece como linha informativa separada, nunca como custo
+    zero. Ver app/services/dre_engine.py."""
+    d = calcular_dre(db, mes_referencia=mes, unidade=unidade)
+    return {
+        "receita_operacional": d.receita_operacional,
+        "custo_frete_terceiro_confirmado": d.custo_frete_terceiro_confirmado,
+        "custo_frete_terceiro_pendente": {
+            "receita": d.custo_frete_terceiro_pendente_receita,
+            "qtd_ctes": d.custo_frete_terceiro_pendente_qtd_ctes,
+        },
+        "combustivel": d.combustivel,
+        "manutencao": d.manutencao,
+        "margem_contribuicao": d.margem_contribuicao,
+        "despesas_operacionais": d.despesas_operacionais,
+        "total_despesas_operacionais": d.total_despesas_operacionais,
+        "resultado_operacional": d.resultado_operacional,
+        "despesas_financeiras": d.despesas_financeiras,
+        "resultado_gerencial": d.resultado_gerencial,
+        "pct_receita_com_custo_terceiro_confirmado": d.pct_receita_com_custo_terceiro_confirmado,
+    }
 
 
 @router.get("/frota")
